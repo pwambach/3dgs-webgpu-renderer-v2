@@ -55,6 +55,12 @@ async function start() {
     uniforms.cameraPos = camera.position;
 
     renderer?.draw(loader.processedSplats);
+
+    // make sure the last buffer upload is also rendered
+    // (note: this won't render twice per frame because the renderer uses a draw queue)
+    requestAnimationFrame(() => {
+      renderer?.draw(loader.processedSplats);
+    });
   });
 
   // sort on camera change
