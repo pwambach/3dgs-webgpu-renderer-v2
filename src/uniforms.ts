@@ -1,18 +1,19 @@
 import { mat4, vec3 } from "gl-matrix";
 
 // struct Uniforms {
-//     modelMatrix: mat4x4f, 0
-//     viewMatrix: mat4x4f, 16
-//     projMatrix: mat4x4f, 32
-//     cameraPos: vec3f, 48
-//     splatSize: f32, 51
+//     model_matrix: mat4x4f, 0
+//     view_matrix: mat4x4f, 16
+//     proj_matrix: mat4x4f, 32
+//     camera_pos: vec3f, 48
+//     splat_size: f32, 51
 //     screen: vec2f, 52
+//     num_splats: u32, 54
 // };
 
 export class Uniforms {
   private device: GPUDevice;
   private dirty = false;
-  private numValues = 16 + 16 + 16 + 3 + 1 + 2 + 2;
+  private numValues = 16 + 16 + 16 + 3 + 1 + 2 + 1 + 1; // last "1" ist for alignment
   private typedArray = new Float32Array(this.numValues);
   buffer?: GPUBuffer;
 
@@ -69,6 +70,12 @@ export class Uniforms {
 
   set screen(s: [number, number]) {
     this.typedArray.set(s, 52);
+    this.dirty = true;
+  }
+
+  set numSplats(v: number) {
+    const u32array = new Uint32Array(this.typedArray.buffer);
+    u32array.set([v], 54);
     this.dirty = true;
   }
 }

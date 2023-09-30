@@ -11,9 +11,9 @@ let splats: Splats | null = null;
 let renderer: Renderer | null = null;
 let uniforms: Uniforms | null = null;
 const sorter = new Sorter();
-const loader = new Loader("/train/point_cloud.ply");
+const loader = new Loader("/truck/point_cloud2.ply");
 const camera = new PerspectiveCamera({
-  position: vec3.fromValues(10, 0, 10),
+  position: vec3.fromValues(3, 0, 0),
   lookAt: vec3.fromValues(0, 0, 0),
 });
 
@@ -45,6 +45,7 @@ async function start() {
 
   loader.addEventListener("end", async () => {
     await sorter.init(loader.attributes.splats, 4, loader.floatsPerSplatOut);
+    sort();
   });
 
   // render on camera change
@@ -64,17 +65,14 @@ async function start() {
   });
 
   // sort on camera change
-  const debouncedSort = debounce(
-    () => {
-      const [x, y, z] = camera.position;
-      sorter.sortByDistance({ x, y, z }).then((sortedIndices) => {
-        splats?.uploadIndices(sortedIndices);
-        renderer?.draw(loader.processedSplats);
-      });
-    },
-    1000,
-    { maxWait: 1000 }
-  );
+  function sort() {
+    const [x, y, z] = camera.position;
+    sorter.sortByDistance({ x, y, z }).then((sortedIndices) => {
+      splats?.uploadIndices(sortedIndices);
+      renderer?.draw(loader.processedSplats);
+    });
+  }
+  const debouncedSort = debounce(sort, 200, { maxWait: 600 });
   camera.addEventListener("change", debouncedSort);
 
   // window resize listener
@@ -113,9 +111,11 @@ function onFirstChunk(detail: any) {
 
   splats.uploadIndices();
   splats.uploadVertices();
+
+  uniforms.numSplats = detail.info.totalSplats;
+
   renderer.setIndexBuffer(splats.indexBuffer!);
   renderer.setVertexBuffer(splats.vertexBuffer!);
-
   renderer.createRenderPipeline();
   renderer.createBindGroup0(splats.storageBuffer!);
   renderer.createBindGroup1(uniforms.buffer!);

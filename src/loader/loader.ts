@@ -138,14 +138,14 @@ export class Loader extends EventTarget {
         splats[vIndex + 2] = this.readValue(dataView, i, "rot_2"),
         splats[vIndex + 3] = this.readValue(dataView, i, "rot_3"),
 
-        splats[vIndex + 4] = this.readValue(dataView, i, "x"),
-        splats[vIndex + 5] = this.readValue(dataView, i, "y") * -1, // we have y-up
-        splats[vIndex + 6] = this.readValue(dataView, i, "z"),
-        splats[vIndex + 7] = this.readValue(dataView, i, "opacity"),
+        splats[vIndex + 4] = this.readValue(dataView, i, "x") * -1,
+        splats[vIndex + 5] = this.readValue(dataView, i, "y") * -1,
+        splats[vIndex + 6] = this.readValue(dataView, i, "z") * -1,
+        splats[vIndex + 7] = sigmoid(this.readValue(dataView, i, "opacity")), 
 
-        splats[vIndex + 8] = this.readValue(dataView, i, "scale_0"),
-        splats[vIndex + 9] = this.readValue(dataView, i, "scale_1"),
-        splats[vIndex + 10] = this.readValue(dataView, i, "scale_2"),
+        splats[vIndex + 8] = Math.exp(this.readValue(dataView, i, "scale_0")),
+        splats[vIndex + 9] = Math.exp(this.readValue(dataView, i, "scale_1")),
+        splats[vIndex + 10] = Math.exp(this.readValue(dataView, i, "scale_2")),
         splats[vIndex + 11] = 0
 
         splats[vIndex + 12] = this.readValue(dataView, i, "f_dc_0")
@@ -191,4 +191,8 @@ export class Loader extends EventTarget {
       true
     );
   }
+}
+
+function sigmoid(x: number) {
+  return 1.0 / (1.0 + Math.exp(-x));
 }
