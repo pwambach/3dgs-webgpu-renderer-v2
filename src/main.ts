@@ -1,17 +1,31 @@
+import debounce from "lodash.debounce";
 import { Loader } from "./loader/loader";
 import { Renderer } from "./renderer/renderer";
 import { PerspectiveCamera } from "./perspective-camera";
 import { vec3, mat4 } from "gl-matrix";
 import { Splats } from "./splats";
 import { Uniforms } from "./uniforms";
+import { Sorter } from "./sorter/sorter";
 
 let splats: Splats | null = null;
 let renderer: Renderer | null = null;
-let loader = new Loader("/train/point_cloud.ply");
+let uniforms: Uniforms | null = null;
+const sorter = new Sorter();
+const loader = new Loader("/train/point_cloud.ply");
+const camera = new PerspectiveCamera({
+  position: vec3.fromValues(10, 0, 10),
+  lookAt: vec3.fromValues(0, 0, 0),
+});
 
 async function start() {
   renderer = new Renderer("canvas");
   await renderer.init();
+
+  uniforms = new Uniforms({ device: renderer.device! });
+  uniforms.modelMatrix = mat4.create();
+  uniforms.viewMatrix = camera.getViewMatrix();
+  uniforms.projectionMatrix = camera.getProjectionMatrix();
+  uniforms.cameraPos = camera.position;
 
   let firstChunkLoaded = false;
 
@@ -25,20 +39,45 @@ async function start() {
 
     if (splats) {
       splats.uploadStorage(e.detail.info.byteStart, e.detail.info.byteEnd);
-      renderer!.draw({
-        vertexBuffer: splats!.vertexBuffer!,
-        indexBuffer: splats!.indexBuffer!,
-        vertexCount: loader.processedSplats,
-      });
+      renderer!.draw(loader.processedSplats);
     }
   });
 
-  loader.addEventListener("end", () => {
-    renderer!.draw({
-      vertexBuffer: splats!.vertexBuffer!,
-      indexBuffer: splats!.indexBuffer!,
-      vertexCount: loader.splatCount,
-    });
+  loader.addEventListener("end", async () => {
+    await sorter.init(loader.attributes.splats, 4, loader.floatsPerSplatOut);
+  });
+
+  // render on camera change
+  camera.addEventListener("change", () => {
+    if (!uniforms) return;
+    uniforms.projectionMatrix = camera.getProjectionMatrix();
+    uniforms.viewMatrix = camera.getViewMatrix();
+    uniforms.cameraPos = camera.position;
+
+    renderer?.draw(loader.processedSplats);
+  });
+
+  // sort on camera change
+  const debouncedSort = debounce(
+    () => {
+      const [x, y, z] = camera.position;
+      sorter.sortByDistance({ x, y, z }).then((sortedIndices) => {
+        splats?.uploadIndices(sortedIndices);
+        renderer?.draw(loader.processedSplats);
+      });
+    },
+    1000,
+    { maxWait: 1000 }
+  );
+  camera.addEventListener("change", debouncedSort);
+
+  // window resize listener
+  window.addEventListener("resize", () => {
+    if (splats && uniforms && renderer) {
+      uniforms.screen = [window.innerWidth, window.innerHeight];
+      uniforms.projectionMatrix = camera.getProjectionMatrix();
+      renderer.draw(loader.processedSplats);
+    }
   });
 
   // const pane = new Pane();
@@ -46,7 +85,6 @@ async function start() {
   //   state.setUniforms();
   // });
 
-  // const sorter = new Sorter()
   // camera.addEventListener('change', () => {
   //   sorter.sort(state.indexBuffer, () => state.uploadIndexBuffer()
   // })
@@ -57,6 +95,10 @@ function onFirstChunk(detail: any) {
     throw new Error("no renderer");
   }
 
+  if (!uniforms) {
+    throw new Error("no uniforms");
+  }
+
   splats = new Splats({
     device: renderer.device!,
     vertices: detail.attributes.splats,
@@ -65,46 +107,12 @@ function onFirstChunk(detail: any) {
 
   splats.uploadIndices();
   splats.uploadVertices();
+  renderer.setIndexBuffer(splats.indexBuffer!);
+  renderer.setVertexBuffer(splats.vertexBuffer!);
 
-  const uniforms = new Uniforms({ device: renderer.device! });
   renderer.createRenderPipeline();
   renderer.createBindGroup0(splats.storageBuffer!);
   renderer.createBindGroup1(uniforms.buffer!);
-
-  const camera = new PerspectiveCamera({
-    position: vec3.fromValues(10, 0, 10),
-    lookAt: vec3.fromValues(0, 0, 0),
-  });
-
-  uniforms.projectionMatrix = camera.getProjectionMatrix();
-  uniforms.viewMatrix = camera.getViewMatrix();
-  uniforms.cameraPos = camera.position;
-
-  uniforms.modelMatrix = mat4.create();
-  camera.addEventListener("change", () => {
-    uniforms.projectionMatrix = camera.getProjectionMatrix();
-    uniforms.viewMatrix = camera.getViewMatrix();
-    uniforms.cameraPos = camera.position;
-
-    if (splats && renderer && splats.vertexBuffer && splats.indexBuffer) {
-      renderer.draw({
-        vertexBuffer: splats.vertexBuffer,
-        indexBuffer: splats.indexBuffer,
-        vertexCount: detail.info.totalSplats,
-      });
-    }
-  });
-
-  window.addEventListener("resize", () => {
-    uniforms.screen = [window.innerWidth, window.innerHeight];
-    if (splats && renderer && splats.vertexBuffer && splats.indexBuffer) {
-      renderer.draw({
-        vertexBuffer: splats.vertexBuffer,
-        indexBuffer: splats.indexBuffer,
-        vertexCount: loader.splatCount,
-      });
-    }
-  });
 }
 
 start();

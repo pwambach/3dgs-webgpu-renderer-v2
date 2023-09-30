@@ -83,10 +83,14 @@ export class Splats {
     );
   }
 
-  uploadIndices() {
+  uploadIndices(indices?: Uint32Array) {
     if (!this.indexBuffer) {
       console.warn("Index buffer not set.");
       return;
+    }
+
+    if (indices) {
+      this.typedArrayIndices = indices;
     }
 
     this.device.queue.writeBuffer(this.indexBuffer, 0, this.typedArrayIndices);

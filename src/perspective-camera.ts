@@ -14,7 +14,6 @@ export class PerspectiveCamera extends EventTarget {
     super();
     this.position = position;
     this.lookAt = lookAt;
-    window.addEventListener("resize", () => this.getProjectionMatrix());
     this.addKeyListeners();
     this.getProjectionMatrix();
   }

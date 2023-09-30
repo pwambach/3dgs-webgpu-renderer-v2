@@ -1,16 +1,21 @@
 import { getDevice } from "../webgpu";
-import renderShaderCode from "../shaders/render.wgsl?raw";
+import renderVertexCode from "../shaders/render-vertex.wgsl?raw";
+import renderFragmentCode from "../shaders/render-fragment.wgsl?raw";
 
 export class Renderer {
   private canvas: HTMLCanvasElement | null;
   private ctx: GPUCanvasContext | null;
-  private renderShaderModule?: GPUShaderModule;
+  private renderVertexModule?: GPUShaderModule;
+  private renderFragmentModule?: GPUShaderModule;
   private canvasFormat?: GPUTextureFormat;
   private renderPipeline?: GPURenderPipeline;
   private bindGroup0?: GPUBindGroup;
   private bindGroup0Layout?: GPUBindGroupLayout;
   private bindGroup1?: GPUBindGroup;
   private bindGroup1Layout?: GPUBindGroupLayout;
+  private indexBuffer?: GPUBuffer;
+  private vertexBuffer?: GPUBuffer;
+  private nextDrawCount = 0;
   device?: GPUDevice;
 
   constructor(canvasId: string) {
@@ -44,15 +49,30 @@ export class Renderer {
       alphaMode: "opaque",
     });
 
-    this.renderShaderModule = this.device.createShaderModule({
-      label: "render shader",
-      code: renderShaderCode,
+    this.renderVertexModule = this.device.createShaderModule({
+      label: "render vertex shader",
+      code: renderVertexCode,
     });
+
+    this.renderFragmentModule = this.device.createShaderModule({
+      label: "render fragment shader",
+      code: renderFragmentCode,
+    });
+
+    this.startDrawLoop();
+  }
+
+  setVertexBuffer(buffer: GPUBuffer) {
+    this.vertexBuffer = buffer;
+  }
+
+  setIndexBuffer(buffer: GPUBuffer) {
+    this.indexBuffer = buffer;
   }
 
   createRenderPipeline() {
-    if (!this.renderShaderModule) {
-      throw new Error("Shader module not defined");
+    if (!this.renderVertexModule || !this.renderFragmentModule) {
+      throw new Error("Shader modules not defined");
     }
 
     if (!this.device) {
@@ -128,12 +148,12 @@ export class Renderer {
       label: "render pipeline",
       layout: pipelineLayout,
       vertex: {
-        module: this.renderShaderModule,
+        module: this.renderVertexModule,
         entryPoint: "vertexMain",
         buffers: [vertexBufferLayout],
       },
       fragment: {
-        module: this.renderShaderModule,
+        module: this.renderFragmentModule,
         entryPoint: "fragmentMain",
         targets: [
           {
@@ -194,16 +214,31 @@ export class Renderer {
     });
   }
 
-  draw({
-    vertexBuffer,
-    indexBuffer,
-    vertexCount,
-  }: {
-    vertexBuffer: GPUBuffer;
-    indexBuffer: GPUBuffer;
-    vertexCount: number;
-  }) {
-    if (!this.device || !this.ctx || !this.renderPipeline) {
+  startDrawLoop() {
+    const loop = () => {
+      if (this.nextDrawCount > 0) {
+        this.drawVertices(this.nextDrawCount);
+        this.nextDrawCount = 0;
+      }
+
+      requestAnimationFrame(loop);
+    };
+
+    loop();
+  }
+
+  draw(count: number) {
+    this.nextDrawCount = count;
+  }
+
+  drawVertices(count: number) {
+    if (
+      !this.device ||
+      !this.ctx ||
+      !this.renderPipeline ||
+      !this.vertexBuffer ||
+      !this.indexBuffer
+    ) {
       return;
     }
 
@@ -221,11 +256,11 @@ export class Renderer {
     });
 
     pass.setPipeline(this.renderPipeline);
-    pass.setVertexBuffer(0, vertexBuffer);
-    pass.setIndexBuffer(indexBuffer, "uint32");
+    pass.setVertexBuffer(0, this.vertexBuffer);
+    pass.setIndexBuffer(this.indexBuffer, "uint32");
     pass.setBindGroup(0, this.bindGroup0!);
     pass.setBindGroup(1, this.bindGroup1!);
-    pass.drawIndexed(vertexCount * 6);
+    pass.drawIndexed(count * 6);
     pass.end();
 
     this.device.queue.submit([encoder.finish()]);
