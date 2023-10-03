@@ -80,4 +80,10 @@ export class Uniforms extends EventTarget {
     u32array.set([v], 54);
     this.dirty = true;
   }
+
+  set numShDegrees(v: number) {
+    const u32array = new Uint32Array(this.typedArray.buffer);
+    u32array.set([v], 55);
+    this.dirty = true;
+  }
 }

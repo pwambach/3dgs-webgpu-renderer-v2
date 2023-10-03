@@ -11,8 +11,8 @@ export async function getDevice() {
 
   const device = await adapter.requestDevice({
     requiredLimits: {
-      maxBufferSize: 512 * 1024 * 1024,
-      maxStorageBufferBindingSize: 512 * 1024 * 1024,
+      maxBufferSize: 2048 * 1024 * 1024,
+      maxStorageBufferBindingSize: 2048 * 1024 * 1024,
     },
   });
 

@@ -1,5 +1,5 @@
 import { fetchIterator } from "./fetch-iterator";
-import { vec3, quat, mat4 } from "gl-matrix";
+import { vec3, quat } from "gl-matrix";
 
 type Properties = Record<string, { type: string; byteOffset: number }>;
 type Attributes = Record<string, Float32Array>;
@@ -11,6 +11,14 @@ interface UpdateInfo {
   byteEnd: number;
 }
 
+// struct Splat {
+//   rotation: vec4f,
+//   position: vec3f,
+//   opacity: f32,
+//   scale: vec3f,
+//   sh: array<vec3f, 16>
+// }
+
 const HEADER_END = "end_header";
 
 export class Loader extends EventTarget {
@@ -21,7 +29,7 @@ export class Loader extends EventTarget {
   private bytesPerSplatIn = 0;
   readonly properties: Properties = {};
   readonly attributes: Attributes = {};
-  readonly floatsPerSplatOut = 4 + 3 + 1 + 4 + 4; //.watch out for webgpu buffer alignment pitfalls here
+  readonly floatsPerSplatOut = 4 + 3 + 1 + 4 + 16 * 4; //watch out for webgpu buffer alignment pitfalls here
   splatCount = 0;
   processedSplats = 0;
   processedByteCount = 0;
@@ -136,21 +144,26 @@ export class Loader extends EventTarget {
     for (let i = 0; i < numSplatsToExtract; i++) {
       const vIndex = (this.processedSplats + i) * this.floatsPerSplatOut;
 
-      // rotate position
-      const x = this.readValue(dataView, i, "x");
-      const y = this.readValue(dataView, i, "y");
-      const z = this.readValue(dataView, i, "z");
-      vec3.set(vecPosition, x, y, z);
+      // create position vec3
+      vec3.set(
+        vecPosition,
+        this.readValue(dataView, i, "x"),
+        this.readValue(dataView, i, "y"),
+        this.readValue(dataView, i, "z")
+      );
+      // rotate  all points 180 deg around x (we want +y up)
       vec3.rotateX(vecPosition, vecPosition, [0, 0, 0], Math.PI);
 
-      // rotate rotation quaternion
-      const rr = this.readValue(dataView, i, "rot_0");
-      const rx = this.readValue(dataView, i, "rot_1");
-      const ry = this.readValue(dataView, i, "rot_2");
-      const rz = this.readValue(dataView, i, "rot_3");
-      quat.set(quatRotation, rx, ry, rz, rr);
+      // normalize rotation quaternion
+      // note that "rot_0" in data is w and "rot_1" is x
+      quat.set(
+        quatRotation,
+        this.readValue(dataView, i, "rot_1"),
+        this.readValue(dataView, i, "rot_2"),
+        this.readValue(dataView, i, "rot_3"),
+        this.readValue(dataView, i, "rot_0")
+      );
       quat.normalize(quatRotation, quatRotation);
-      // quat.rotateX(quatRotation, quatRotation, Math.PI);
 
       // prettier-ignore
       {
@@ -170,10 +183,26 @@ export class Loader extends EventTarget {
         splats[vIndex + 10] = Math.exp(this.readValue(dataView, i, "scale_2")),
         splats[vIndex + 11] = 0
 
+        // sh coefficients
         splats[vIndex + 12] = this.readValue(dataView, i, "f_dc_0")
         splats[vIndex + 13] = this.readValue(dataView, i, "f_dc_1")
         splats[vIndex + 14] = this.readValue(dataView, i, "f_dc_2")
         splats[vIndex + 15] = 0
+
+        for (let j = 0; j < 15; j++) {
+          // splats[vIndex + 16 + j * 4] = this.readValue(dataView, i, `f_rest_${j * 3 + 0}`)
+          // splats[vIndex + 17 + j * 4] = this.readValue(dataView, i, `f_rest_${j * 3 + 1}`)
+          // splats[vIndex + 18 + j * 4] = this.readValue(dataView, i, `f_rest_${j * 3 + 2}`)
+          splats[vIndex + 16 + j * 4] = this.readValue(dataView, i, `f_rest_${j}`)
+          splats[vIndex + 17 + j * 4] = this.readValue(dataView, i, `f_rest_${j + 15}`)
+          splats[vIndex + 18 + j * 4] = this.readValue(dataView, i, `f_rest_${j + 30}`)
+          splats[vIndex + 19 + j * 4] = 0
+
+          if (i < 2 && this.processedSplats === 0) {
+           console.log(i, `f_rest_${j * 3 + 0}`, `f_rest_${j * 3 + 1}`, `f_rest_${j * 3 + 2}`);
+           console.log(i, vIndex + 16 + j * 4, vIndex + 17 + j * 4, vIndex + 18 + j * 4);
+          }
+        }
       }
     }
 

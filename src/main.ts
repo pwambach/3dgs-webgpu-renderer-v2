@@ -16,7 +16,7 @@ const camera = new OrbitCamera({
   position: vec3.fromValues(-5, 0, 0),
   lookAt: vec3.fromValues(0, -1, -0.2),
 });
-const loader = new Loader("/garden/point_cloud.ply");
+const loader = new Loader("/truck/point_cloud2.ply");
 new Pane(uniforms, camera);
 
 let splats: Splats | null = null;
@@ -74,7 +74,7 @@ async function start() {
         renderer.draw(loader.processedSplats);
       });
   }
-  const debouncedSort = debounce(sort, 200, { maxWait: 1000 });
+  const debouncedSort = debounce(sort, 500, { maxWait: 2000 });
   camera.addEventListener("change", debouncedSort);
 
   // window resize listener

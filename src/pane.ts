@@ -7,7 +7,7 @@ export class Pane {
   bindings: Record<string, any> = {};
 
   constructor(uniforms: Uniforms, camera: OrbitCamera) {
-    const params = { splatSize: 1, autoRotateSpeed: 0 };
+    const params = { splatSize: 1, autoRotateSpeed: 0, numShDegrees: 0 };
     this.tp = new TweakPane();
 
     // prevent camera move when dragging sliders
@@ -22,6 +22,17 @@ export class Pane {
 
     this.bindings.splatSize.on("change", (e: any) => {
       uniforms.splatSize = e.value;
+    });
+
+    // @ts-ignore
+    this.bindings.numShDegrees = this.tp.addBinding(params, "numShDegrees", {
+      min: 0,
+      max: 3,
+      step: 1,
+    });
+
+    this.bindings.numShDegrees.on("change", (e: any) => {
+      uniforms.numShDegrees = e.value;
     });
 
     // @ts-ignore

@@ -3,7 +3,7 @@ struct Splat {
     position: vec3f,
     opacity: f32,
     scale: vec3f,
-    sh: vec3f
+    sh: array<vec3f, 16>
 }
 
 struct Uniforms {
@@ -13,10 +13,28 @@ struct Uniforms {
     camera_pos: vec3f,
     splat_size: f32,
     screen: vec2f,
-    num_splats: u32
+    num_splats: u32,
+    num_sh_degrees: u32
 };
 
 const SH0 = 0.28209479177387814f;
+const SH1 = 0.4886025119029199f;
+const SH2 = array(
+    1.0925484305920792f,
+    -1.0925484305920792f,
+    0.31539156525252005f,
+    -1.0925484305920792f,
+    0.5462742152960396f
+);
+const SH3 = array(
+    -0.5900435899266435f,
+    2.890611442640554f,
+    -0.4570457994644658f,
+    0.3731763325901154f,
+    -0.4570457994644658f,
+    1.445305721320277f,
+    -0.5900435899266435f
+);
 
 @group(0) @binding(0) var<storage> splats: array<Splat>;
 @group(1) @binding(0) var<uniform> uniforms: Uniforms;
@@ -36,7 +54,6 @@ fn vertexMain(
         var index = vertex_index % uniforms.num_splats;
         var offset_index = (vertex_index / uniforms.num_splats);
         var splat = splats[index];
-
         var scale = splat.scale * uniforms.splat_size;
 
         // SPLAT PROJECTION
@@ -47,8 +64,6 @@ fn vertexMain(
         var cov2d = covariance2D(splat.position, uniforms.view_matrix * uniforms.model_matrix, uniforms.proj_matrix, cov3d);
         var det: f32 = cov2d[0][0] * cov2d[1][1] - cov2d[1][0] * cov2d[1][0];
         
-        var clip_position = uniforms.proj_matrix * uniforms.view_matrix * uniforms.model_matrix * vec4f(splat.position, 1);
-        var w: f32 = clip_position.w;
 
         var mid: f32 = 0.5 * (cov2d[0][0] + cov2d[1][1]);
         var lambda1: f32 = mid + sqrt(max(0.1f, mid * mid - det));
@@ -60,18 +75,60 @@ fn vertexMain(
         var vertex_offset = p[offset_index];
         // var vertex_offset = vec2f(f32(offset_index&1), f32((offset_index>>1)&1)) * 2 - 1;
 
+        var clip_position = uniforms.proj_matrix * uniforms.view_matrix * uniforms.model_matrix * vec4f(splat.position, 1);
+        var w: f32 = clip_position.w;
+
+        // set outputs
         var output: VertexOut;
         // output.position = uniforms.proj_matrix * uniforms.view_matrix * vec4f(splat.position, 1);
         // output.position = vec4f(output.position.xy + vertex_offset * 0.005, output.position.zw);
         output.position = vec4f(clip_position.xy / w + 2 * radius_ndc * vertex_offset, clip_position.z / w, 1);
-        output.color_and_opacity = vec4(calcColor(splat.sh), splat.opacity);
+        output.color_and_opacity = vec4(calcColor(splat.position, splat.sh), splat.opacity);
         output.conic = vec3f(cov2d[1][1], cov2d[1][0], cov2d[0][0]) * (1 / det);
         output.uv_px = vertex_offset * radius_px;
         return output;
+        
 }
 
-fn calcColor(coeffs: vec3f) -> vec3f {
-    return SH0 * coeffs + 0.5;
+fn calcColor(splat_position: vec3f, coeffs: array<vec3f, 16>) -> vec3f {
+    let dir = normalize(splat_position - uniforms.camera_pos); 
+    var color = SH0 * coeffs[0] + 0.5; // sh degree = 0
+    
+    // sh degree = 1
+    if (uniforms.num_sh_degrees > 0) {
+        color += SH1 * (-dir.y * coeffs[1] + dir.z * coeffs[2] - dir.x * coeffs[3]);
+
+        // sh degree = 2
+        if (uniforms.num_sh_degrees > 1) {
+            let xx = dir.x * dir.x;
+            let yy = dir.y * dir.y;
+            let zz = dir.z * dir.z;
+            let xy = dir.x * dir.y;
+            let xz = dir.x * dir.z;
+            let yz = dir.y * dir.z;
+
+            color +=
+                SH2[0] * xy * coeffs[4] +
+                SH2[1] * yz * coeffs[5] +
+                SH2[2] * (2. * zz - xx - yy) * coeffs[6] +
+                SH2[3] * xz * coeffs[7] +
+                SH2[4] * (xx - yy) * coeffs[8];
+
+            // sh degree = 3
+            if (uniforms.num_sh_degrees > 2) {
+                color +=
+                    SH3[0] * dir.y * (3. * xx - yy) * coeffs[9] +
+                    SH3[1] * xy * dir.z * coeffs[10] +
+                    SH3[2] * dir.y * (4. * zz - xx - yy) * coeffs[11] +
+                    SH3[3] * dir.z * (2. * zz - 3. * xx - 3. * yy) * coeffs[12] +
+                    SH3[4] * dir.x * (4. * zz - xx - yy) * coeffs[13] +
+                    SH3[5] * dir.z * (xx - yy) * coeffs[14] +
+                    SH3[6] * dir.x * (xx - 3. * yy) * coeffs[15];
+            }
+        }
+    }
+
+    return max(color, vec3f(0));
 }
 
 fn getRotScaleMatrix(rot: vec4f, scale: vec3f) -> mat3x3f {
