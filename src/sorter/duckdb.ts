@@ -26,6 +26,8 @@ await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
 const cPromise = db.connect();
 const c = await cPromise;
 
+let stmt = null;
+
 export async function loadIntoDB(
   splats: Float32Array,
   offset: number,
@@ -55,18 +57,17 @@ export async function loadIntoDB(
 
   const arrowTable = tableFromArrays(columns);
   await conn.insertArrowTable(arrowTable, { name: "positions" });
+
+  stmt = await conn.prepare(
+    `SELECT index FROM positions ORDER BY ((x - ?)^2 + (y - ?)^2 + (z - ?)^2);`
+  );
 }
 
-export async function sortByDistance(p: { x: number; y: number; z: number }) {
+export async function sortByDistance(p: [x: number, y: number, z: number]) {
   const time = Date.now();
-  const result = await c.query(
-    `
-    WITH sortedIndices AS (
-      SELECT index FROM positions ORDER BY ((x - ${p.x})^2 + (y - ${p.y})^2 + (z - ${p.z})^2)
-    )
-    SELECT index FROM sortedIndices;
-    `
-  );
+
+  // @ts-ignore
+  const result = await stmt!.query(p[0], p[1], p[2]);
 
   console.log(Date.now() - time, "ms");
   return result.getChild("index")?.toArray();

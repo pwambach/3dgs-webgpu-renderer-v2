@@ -31,8 +31,8 @@ export class PerspectiveCamera extends EventTarget {
 
     const loop = () => {
       const speed = this.keys["shift"] ? 8 : 1;
-      if (this.keys["a"]) this.rotateY(-0.2 * speed);
-      if (this.keys["d"]) this.rotateY(0.2 * speed);
+      if (this.keys["a"]) this.rotateY(-0.4 * speed);
+      if (this.keys["d"]) this.rotateY(0.4 * speed);
       if (this.keys["e"]) this.moveInOut(-0.1 * speed);
       if (this.keys["q"]) this.moveInOut(0.1 * speed);
       if (this.keys["w"]) this.moveUpDown(0.05 * speed);

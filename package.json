@@ -21,6 +21,7 @@
     "apache-arrow": "^13.0.0",
     "gl-matrix": "^3.4.3",
     "lodash.debounce": "^4.0.8",
+    "orbit-controls": "^1.2.4",
     "tweakpane": "^4.0.1"
   }
 }

@@ -10,7 +10,7 @@ import { mat4, vec3 } from "gl-matrix";
 //     num_splats: u32, 54
 // };
 
-export class Uniforms {
+export class Uniforms extends EventTarget {
   private device: GPUDevice;
   private dirty = false;
   private numValues = 16 + 16 + 16 + 3 + 1 + 2 + 1 + 1; // last "1" ist for alignment
@@ -18,12 +18,14 @@ export class Uniforms {
   buffer?: GPUBuffer;
 
   constructor({ device }: { device: GPUDevice }) {
+    super();
     this.device = device;
 
     const loop = () => {
       if (this.dirty && this.buffer) {
         device.queue.writeBuffer(this.buffer, 0, this.typedArray);
         this.dirty = false;
+        this.dispatchEvent(new Event("change"));
       }
       requestAnimationFrame(loop);
     };

@@ -1,4 +1,5 @@
 import { fetchIterator } from "./fetch-iterator";
+import { vec3, quat, mat4 } from "gl-matrix";
 
 type Properties = Record<string, { type: string; byteOffset: number }>;
 type Attributes = Record<string, Float32Array>;
@@ -129,18 +130,39 @@ export class Loader extends EventTarget {
     const dataView = new DataView(this.tmpBuffer.buffer);
     const splats = this.attributes.splats;
 
+    const vecPosition = vec3.create();
+    const quatRotation = quat.create();
+
     for (let i = 0; i < numSplatsToExtract; i++) {
       const vIndex = (this.processedSplats + i) * this.floatsPerSplatOut;
+
+      // rotate position
+      const x = this.readValue(dataView, i, "x");
+      const y = this.readValue(dataView, i, "y");
+      const z = this.readValue(dataView, i, "z");
+      vec3.set(vecPosition, x, y, z);
+      vec3.rotateX(vecPosition, vecPosition, [0, 0, 0], Math.PI);
+
+      // rotate rotation quaternion
+      const rr = this.readValue(dataView, i, "rot_0");
+      const rx = this.readValue(dataView, i, "rot_1");
+      const ry = this.readValue(dataView, i, "rot_2");
+      const rz = this.readValue(dataView, i, "rot_3");
+      quat.set(quatRotation, rx, ry, rz, rr);
+      quat.normalize(quatRotation, quatRotation);
+      // quat.rotateX(quatRotation, quatRotation, Math.PI);
+
       // prettier-ignore
       {
-        splats[vIndex + 0] = this.readValue(dataView, i, "rot_0"),
-        splats[vIndex + 1] = this.readValue(dataView, i, "rot_1"),
-        splats[vIndex + 2] = this.readValue(dataView, i, "rot_2"),
-        splats[vIndex + 3] = this.readValue(dataView, i, "rot_3"),
+        splats[vIndex + 0] = quatRotation[3],
+        splats[vIndex + 1] = quatRotation[0],
+        splats[vIndex + 2] = quatRotation[1],
+        splats[vIndex + 3] = quatRotation[2],
 
-        splats[vIndex + 4] = this.readValue(dataView, i, "x") * -1,
-        splats[vIndex + 5] = this.readValue(dataView, i, "y") * -1,
-        splats[vIndex + 6] = this.readValue(dataView, i, "z") * -1,
+        splats[vIndex + 4] = vecPosition[0],
+        splats[vIndex + 5] = vecPosition[1],
+        splats[vIndex + 6] = vecPosition[2],
+        
         splats[vIndex + 7] = sigmoid(this.readValue(dataView, i, "opacity")), 
 
         splats[vIndex + 8] = Math.exp(this.readValue(dataView, i, "scale_0")),

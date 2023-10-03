@@ -40,14 +40,14 @@ fn vertexMain(
         var scale = splat.scale * uniforms.splat_size;
 
         // SPLAT PROJECTION
-        var rot_scale_mat = getRotScaleMatrix(normalize(splat.rotation), scale);
+        var rot_scale_mat = getRotScaleMatrix(splat.rotation, scale);
         // see https://datascienceplus.com/understanding-the-covariance-matrix/ "C=RSSR^−1=TT^T"
         var cov3d = rot_scale_mat * transpose(rot_scale_mat);
 
-        var cov2d = covariance2D(splat.position, uniforms.view_matrix, uniforms.proj_matrix, cov3d);
+        var cov2d = covariance2D(splat.position, uniforms.view_matrix * uniforms.model_matrix, uniforms.proj_matrix, cov3d);
         var det: f32 = cov2d[0][0] * cov2d[1][1] - cov2d[1][0] * cov2d[1][0];
         
-        var clip_position = uniforms.proj_matrix * uniforms.view_matrix * vec4f(splat.position, 1);
+        var clip_position = uniforms.proj_matrix * uniforms.view_matrix * uniforms.model_matrix * vec4f(splat.position, 1);
         var w: f32 = clip_position.w;
 
         var mid: f32 = 0.5 * (cov2d[0][0] + cov2d[1][1]);
@@ -80,8 +80,16 @@ fn getRotScaleMatrix(rot: vec4f, scale: vec3f) -> mat3x3f {
     let y = rot[2];
     let z = rot[3];
 
+
+    // rotate again
+    var rot2 = mat3x3f(
+        1, 0, 0,
+        0, -1, 0,
+        0, 0, -1
+    );
+
     // rotation matrix * scale matrix
-    return mat3x3f(
+    return rot2 * mat3x3f(
         1-2*(y*y + z*z), 2*(x*y + r*z), 2*(x*z - r*y),
         2*(x*y - r*z), 1-2*(x*x + z*z), 2*(y*z + r*x),
         2*(x*z + r*y), 2*(y*z - r*x), 1-2*(x*x + y*y)

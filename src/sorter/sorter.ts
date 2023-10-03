@@ -8,7 +8,7 @@ export class Sorter {
     this.output = new Uint32Array((splats.length / stride) * 6);
   }
 
-  async sortByDistance(position: { x: number; y: number; z: number }) {
+  async sortByDistance(position: [x: number, y: number, z: number]) {
     const sortedIndices = await sortByDistance(position);
     const splatCount = this.output.length / 6;
 
