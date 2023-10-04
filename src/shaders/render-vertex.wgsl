@@ -171,9 +171,9 @@ fn covariance2D(world_pos: vec3f, view_mat: mat4x4f, proj_mat: mat4x4f, cov3d: m
     view_pos.x = clamp(view_pos.x / view_pos.z, -limX, limX) * view_pos.z;
     view_pos.y = clamp(view_pos.y / view_pos.z, -limY, limY) * view_pos.z;
 
-    // Jacobian
     let focal = uniforms.screen.x * proj_mat[0][0] / 2;
 
+    // Jacobian
     // self transposed
     var J = transpose(mat4x4f(
         focal / view_pos.z, 0, -(focal * view_pos.x) / (view_pos.z * view_pos.z), 0,
@@ -189,16 +189,12 @@ fn covariance2D(world_pos: vec3f, view_mat: mat4x4f, proj_mat: mat4x4f, cov3d: m
 
     var T: mat4x4f = J * W;
 
-    var cov3d0 = vec3f(cov3d[0][0], cov3d[1][0], cov3d[2][0]);
-    var cov3d1 = vec3f(cov3d[1][1], cov3d[2][1], cov3d[2][2]);
-
-    // self transposed
-    var V = transpose(mat4x4f(
-        cov3d0.x, cov3d0.y, cov3d0.z, 0,
-        cov3d0.y, cov3d1.x, cov3d1.y, 0,
-        cov3d0.z, cov3d1.y, cov3d1.z, 0,
+    var V = mat4x4f(
+        cov3d[0][0], cov3d[1][0], cov3d[2][0], 0,
+        cov3d[1][0], cov3d[1][1], cov3d[2][1], 0,
+        cov3d[2][0], cov3d[2][1], cov3d[2][2], 0,
         0, 0, 0, 0
-    ));
+    );
 
     var cov2d: mat4x4f = T * V * transpose(T);
 
