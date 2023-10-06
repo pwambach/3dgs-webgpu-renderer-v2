@@ -163,6 +163,7 @@ export class Loader extends EventTarget {
         this.readValue(dataView, i, "rot_3"),
         this.readValue(dataView, i, "rot_0")
       );
+      // quat.rotateZ(quatRotation, quatRotation, Math.PI);
       quat.normalize(quatRotation, quatRotation);
 
       // prettier-ignore
