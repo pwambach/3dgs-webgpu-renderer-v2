@@ -99,9 +99,12 @@ fn vertexMain(
         vec2(-1,-1)
     );
 
+    var clip_position = uniforms.proj_matrix * uniforms.view_matrix * uniforms.model_matrix * vec4f(splat.position, 1);
+    clip_position = clip_position / clip_position.w;
+
     // set outputs
     var output: VertexOut;
-    output.position = vec4f(position, 0, 1);
+    output.position = vec4f(clip_position.xy + position, clip_position.z, 1);
     output.color_and_opacity = vec4(calcColor(splat.position, splat.sh), splat.opacity);
     output.uv = uv[offset_index];
     return output;
