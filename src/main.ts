@@ -16,7 +16,7 @@ const camera = new OrbitCamera({
   position: vec3.fromValues(-5, 0, 0),
   lookAt: vec3.fromValues(0, -1, -0.2),
 });
-const loader = new Loader("/truck/point_cloud.ply");
+const loader = new Loader("/truck/point_cloud2.ply");
 new Pane(uniforms, camera);
 
 let splats: Splats | null = null;
