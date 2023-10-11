@@ -31,11 +31,18 @@ export class Sorter2 extends EventTarget {
       this.output = e.data[1];
       this.splats = e.data[2];
       this.dispatchEvent(new Event("sorted"));
+
+      if (this.needsSort) {
+        // this.update([1, 1, 1]);
+      }
+
+      this.needsSort = false;
     };
   }
 
   update(cameraPosition: vec3) {
     if (this.isSorting) {
+      this.needsSort = true;
       return;
     }
 
@@ -53,15 +60,13 @@ export class Sorter2 extends EventTarget {
   }
 
   private sort(position: vec3) {
+    console.log("real sort call");
+
     this.time = Date.now();
 
-    if (this.indices.length > 0) {
-      this.worker.postMessage(
-        [this.indices, this.output, this.splats, position, this.stride],
-        [this.indices.buffer, this.output.buffer, this.splats.buffer]
-      );
-    } else {
-      console.warn("buffer still detached!");
-    }
+    this.worker.postMessage(
+      [this.indices, this.output, this.splats, position, this.stride],
+      [this.indices.buffer, this.output.buffer, this.splats.buffer]
+    );
   }
 }

@@ -35,9 +35,6 @@ self.onmessage = (e: Event) => {
 
   //   console.log("3 fill 2", Date.now() - t);
 
-  // sort index by distance
-  // write output from sorted index
-
   self.postMessage(
     [indices, output, splats],
     // @ts-ignore

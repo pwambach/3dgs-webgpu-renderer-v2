@@ -41,25 +41,25 @@ async function start() {
   });
 
   loader.addEventListener("end", async () => {
-    await sorter.init(loader.attributes.splats, 4, loader.floatsPerSplatOut);
-    sort();
+    // await sorter.init(loader.attributes.splats, 4, loader.floatsPerSplatOut);
+    // sort();
 
-    // const sorter = new Sorter2(
-    //   loader.attributes.splats,
-    //   loader.floatsPerSplatOut
-    // );
+    const sorter = new Sorter2(
+      loader.attributes.splats,
+      loader.floatsPerSplatOut
+    );
 
-    // sorter.addEventListener("sorted", () => {
-    //   splats?.uploadIndices(sorter.output);
-    //   renderer.draw(loader.processedSplats);
-    // });
+    sorter.addEventListener("sorted", () => {
+      splats?.uploadIndices(sorter.output);
+      renderer.draw(loader.processedSplats);
+    });
 
-    // const loop = () => {
-    //   sorter.update(camera.controls.position);
-    //   requestAnimationFrame(loop);
-    // };
+    const loop = () => {
+      sorter.update(camera.controls.position);
+      requestAnimationFrame(loop);
+    };
 
-    // loop();
+    loop();
   });
 
   // on camera change
@@ -81,19 +81,19 @@ async function start() {
   });
 
   // sort on camera change
-  function sort() {
-    if (sorter.output.length === 0) {
-      return;
-    }
-    sorter
-      .sortByDistance(camera.controls.position as [number, number, number])
-      .then((sortedIndices) => {
-        splats?.uploadIndices(sortedIndices);
-        renderer.draw(loader.processedSplats);
-      });
-  }
-  const debouncedSort = debounce(sort, 500, { maxWait: 2000 });
-  camera.addEventListener("change", debouncedSort);
+  // function sort() {
+  //   if (sorter.output.length === 0) {
+  //     return;
+  //   }
+  //   sorter
+  //     .sortByDistance(camera.controls.position as [number, number, number])
+  //     .then((sortedIndices) => {
+  //       splats?.uploadIndices(sortedIndices);
+  //       renderer.draw(loader.processedSplats);
+  //     });
+  // }
+  // const debouncedSort = debounce(sort, 500, { maxWait: 2000 });
+  // camera.addEventListener("change", debouncedSort);
 
   // window resize listener
   window.addEventListener("resize", () => {
