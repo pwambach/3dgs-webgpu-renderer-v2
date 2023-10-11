@@ -141,6 +141,11 @@ export class Loader extends EventTarget {
     const vecPosition = vec3.create();
     const quatRotation = quat.create();
 
+    const bytesPerSplatIn = this.bytesPerSplatIn;
+    const fcRestByteOffsets = Object.keys(this.properties)
+      .filter((key) => key.startsWith("f_rest"))
+      .map((key) => this.properties[key].byteOffset);
+
     for (let i = 0; i < numSplatsToExtract; i++) {
       const vIndex = (this.processedSplats + i) * this.floatsPerSplatOut;
 
@@ -182,29 +187,28 @@ export class Loader extends EventTarget {
         splats[vIndex + 8] = Math.exp(this.readValue(dataView, i, "scale_0")),
         splats[vIndex + 9] = Math.exp(this.readValue(dataView, i, "scale_1")),
         splats[vIndex + 10] = Math.exp(this.readValue(dataView, i, "scale_2")),
-        splats[vIndex + 11] = 0
 
         // sh coefficients
         splats[vIndex + 12] = this.readValue(dataView, i, "f_dc_0")
         splats[vIndex + 13] = this.readValue(dataView, i, "f_dc_1")
         splats[vIndex + 14] = this.readValue(dataView, i, "f_dc_2")
-        splats[vIndex + 15] = 0
 
         for (let j = 0; j < 15; j++) {
-          // splats[vIndex + 16 + j * 4] = this.readValue(dataView, i, `f_rest_${j * 3 + 0}`)
-          // splats[vIndex + 17 + j * 4] = this.readValue(dataView, i, `f_rest_${j * 3 + 1}`)
-          // splats[vIndex + 18 + j * 4] = this.readValue(dataView, i, `f_rest_${j * 3 + 2}`)
-          splats[vIndex + 16 + j * 4] = this.readValue(dataView, i, `f_rest_${j}`)
-          splats[vIndex + 17 + j * 4] = this.readValue(dataView, i, `f_rest_${j + 15}`)
-          splats[vIndex + 18 + j * 4] = this.readValue(dataView, i, `f_rest_${j + 30}`)
-          splats[vIndex + 19 + j * 4] = 0
-
-          if (i < 2 && this.processedSplats === 0) {
-           console.log(i, `f_rest_${j * 3 + 0}`, `f_rest_${j * 3 + 1}`, `f_rest_${j * 3 + 2}`);
-           console.log(i, vIndex + 16 + j * 4, vIndex + 17 + j * 4, vIndex + 18 + j * 4);
-          }
+          splats[vIndex + 16 + j * 4] = dataView.getFloat32(
+            i * bytesPerSplatIn + fcRestByteOffsets[j],
+            true
+          )
+          
+          splats[vIndex + 17 + j * 4] = dataView.getFloat32(
+            i * bytesPerSplatIn + fcRestByteOffsets[j + 15],
+            true
+          )
+          splats[vIndex + 18 + j * 4] = dataView.getFloat32(
+            i * bytesPerSplatIn + fcRestByteOffsets[j + 30],
+            true
+          )
         }
-      }
+       }
     }
 
     this.processedSplats += numSplatsToExtract;

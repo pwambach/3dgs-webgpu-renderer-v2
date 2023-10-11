@@ -32,8 +32,8 @@ export class Renderer {
     }
 
     const handleResize = () => {
-      this.canvas!.width = window.innerWidth; // window.devicePixelRatio;
-      this.canvas!.height = window.innerHeight; // window.devicePixelRatio;
+      this.canvas!.width = window.innerWidth * 1; // window.devicePixelRatio;
+      this.canvas!.height = window.innerHeight * 1; // window.devicePixelRatio;
     };
     handleResize();
     window.addEventListener("resize", handleResize);

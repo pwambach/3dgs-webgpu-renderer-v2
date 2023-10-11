@@ -7,6 +7,7 @@ import { Splats } from "./splats";
 import { Uniforms } from "./uniforms";
 import { Sorter } from "./sorter/sorter";
 import { Pane } from "./pane";
+import { Sorter2 } from "./sorter/sorter2";
 
 let renderer: Renderer = new Renderer("canvas");
 await renderer.init();
@@ -16,13 +17,13 @@ const camera = new OrbitCamera({
   position: vec3.fromValues(-5, 0, 0),
   lookAt: vec3.fromValues(0, -1, -0.2),
 });
-const loader = new Loader("/truck/point_cloud.ply");
+const loader = new Loader("/truck/point_cloud2.ply");
 new Pane(uniforms, camera);
 
 let splats: Splats | null = null;
 
 async function start() {
-  uniforms.modelMatrix = mat4.fromXRotation(mat4.create(), -0.5);
+  uniforms.modelMatrix = mat4.fromXRotation(mat4.create(), -0.2);
   uniforms.viewMatrix = camera.getViewMatrix();
   uniforms.projectionMatrix = camera.getProjectionMatrix();
   uniforms.cameraPos = camera.controls.position;
@@ -42,6 +43,23 @@ async function start() {
   loader.addEventListener("end", async () => {
     await sorter.init(loader.attributes.splats, 4, loader.floatsPerSplatOut);
     sort();
+
+    // const sorter = new Sorter2(
+    //   loader.attributes.splats,
+    //   loader.floatsPerSplatOut
+    // );
+
+    // sorter.addEventListener("sorted", () => {
+    //   splats?.uploadIndices(sorter.output);
+    //   renderer.draw(loader.processedSplats);
+    // });
+
+    // const loop = () => {
+    //   sorter.update(camera.controls.position);
+    //   requestAnimationFrame(loop);
+    // };
+
+    // loop();
   });
 
   // on camera change

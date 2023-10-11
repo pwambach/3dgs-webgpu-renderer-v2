@@ -42,7 +42,7 @@ const SH3 = array(
 struct VertexOut {
     @builtin(position) position: vec4f,
     @location(0) color_and_opacity: vec4f,
-    @location(2) uv: vec2f
+    @location(1) uv: vec2f
 }
 
 @vertex
@@ -194,13 +194,13 @@ fn covariance2D(world_pos: vec3f, view_mat: mat4x4f, proj_mat: mat4x4f, cov3d: m
     view_pos.x = clamp(view_pos.x / view_pos.z, -limX, limX) * view_pos.z;
     view_pos.y = clamp(view_pos.y / view_pos.z, -limY, limY) * view_pos.z;
 
-    let focal = uniforms.screen.x * proj_mat[0][0] / 2;
+    let f = uniforms.screen.x * proj_mat[0][0] / 2;
 
     // Jacobian
     // self transposed
     var J = transpose(mat3x3f(
-        focal / view_pos.z, 0, -(focal * view_pos.x) / (view_pos.z * view_pos.z),
-        0, focal / view_pos.z, -(focal * view_pos.y) / (view_pos.z * view_pos.z),
+        f / view_pos.z, 0, -(f * view_pos.x) / (view_pos.z * view_pos.z),
+        0, f / view_pos.z, -(f * view_pos.y) / (view_pos.z * view_pos.z),
         0, 0, 0
     ));
 
@@ -222,8 +222,8 @@ fn covariance2D(world_pos: vec3f, view_mat: mat4x4f, proj_mat: mat4x4f, cov3d: m
 
     // Make each splat at least 1px size.
     // TODO: Do we really need this?
-    cov2d[0][0] += 0.3;
-    cov2d[1][1] += 0.3;
+    cov2d[0][0] += 0.25;
+    cov2d[1][1] += 0.25;
 
     // We only need a,b and d of the 2x2 matrix because b = c
     return vec3f(cov2d[0][0], cov2d[0][1], cov2d[1][1]);
