@@ -15,7 +15,7 @@ export class OrbitCamera extends EventTarget {
   constructor({
     position,
     lookAt,
-    autoRotateSpeed = 0,
+    autoRotateSpeed = 0.1,
   }: {
     position: vec3;
     lookAt: vec3;

@@ -1,5 +1,5 @@
 import { fetchIterator } from "./fetch-iterator";
-import { vec3, quat } from "gl-matrix";
+import { vec3, quat, mat3 } from "gl-matrix";
 
 type Properties = Record<string, { type: string; byteOffset: number }>;
 type Attributes = Record<string, Float32Array>;
@@ -12,10 +12,9 @@ interface UpdateInfo {
 }
 
 // struct Splat {
-//   rotation: vec4f,
 //   position: vec3f,
-//   opacity: f32,
-//   scale: vec3f,
+//   cov3d1: vec3f,
+//   cov3d2: vec3f,
 //   sh: array<vec3f, 16>
 // }
 
@@ -29,14 +28,16 @@ export class Loader extends EventTarget {
   private bytesPerSplatIn = 0;
   readonly properties: Properties = {};
   readonly attributes: Attributes = {};
-  readonly floatsPerSplatOut = 4 + 3 + 1 + 4 + 16 * 4; //watch out for webgpu buffer alignment pitfalls here
+  readonly floatsPerSplatOut = 4 + 4 + 4 + 16 * 4; // watch out for webgpu buffer alignment pitfalls here
   splatCount = 0;
   processedSplats = 0;
   processedByteCount = 0;
+  initTime = 0;
 
-  constructor(url: string) {
+  constructor(url: string, initTime: number) {
     super();
     this.url = url;
+    this.initTime = initTime;
   }
 
   load() {
@@ -138,8 +139,18 @@ export class Loader extends EventTarget {
     const dataView = new DataView(this.tmpBuffer.buffer);
     const splats = this.attributes.splats;
 
+    const bytesPerSplatIn = this.bytesPerSplatIn;
+    // perf optimization
+    const fcRestByteOffsets = Object.keys(this.properties)
+      .filter((key) => key.startsWith("f_rest"))
+      .map((key) => this.properties[key].byteOffset);
+
     const vecPosition = vec3.create();
     const quatRotation = quat.create();
+    const matRotateExtra = mat3.fromValues(1, 0, 0, 0, -1, 0, 0, 0, -1);
+    const matScale = mat3.create();
+    const matRotate = mat3.create();
+    const matCov3d = mat3.create();
 
     for (let i = 0; i < numSplatsToExtract; i++) {
       const vIndex = (this.processedSplats + i) * this.floatsPerSplatOut;
@@ -151,10 +162,16 @@ export class Loader extends EventTarget {
         this.readValue(dataView, i, "y"),
         this.readValue(dataView, i, "z")
       );
-      // rotate  all points 180 deg around x (we want +y up)
+      // rotate all points 180 deg around x (we want +y up)
       vec3.rotateX(vecPosition, vecPosition, [0, 0, 0], Math.PI);
 
-      // normalize rotation quaternion
+      // scale
+      const scaleX = Math.exp(this.readValue(dataView, i, "scale_0"));
+      const scaleY = Math.exp(this.readValue(dataView, i, "scale_1"));
+      const scaleZ = Math.exp(this.readValue(dataView, i, "scale_2"));
+      mat3.set(matScale, scaleX, 0, 0, 0, scaleY, 0, 0, 0, scaleZ);
+
+      // calculate cov3d from scale and rotation
       // note that "rot_0" in data is w and "rot_1" is x
       quat.set(
         quatRotation,
@@ -163,27 +180,31 @@ export class Loader extends EventTarget {
         this.readValue(dataView, i, "rot_3"),
         this.readValue(dataView, i, "rot_0")
       );
-      // quat.rotateZ(quatRotation, quatRotation, Math.PI);
       quat.normalize(quatRotation, quatRotation);
+      mat3.fromQuat(matRotate, quatRotation);
+      mat3.mul(matCov3d, matRotateExtra, matRotate);
+      mat3.mul(matCov3d, matCov3d, matScale);
+      mat3.transpose(matRotate, matCov3d);
+      mat3.mul(matCov3d, matCov3d, matRotate);
 
       // prettier-ignore
       {
-        splats[vIndex + 0] = quatRotation[3],
-        splats[vIndex + 1] = quatRotation[0],
-        splats[vIndex + 2] = quatRotation[1],
-        splats[vIndex + 3] = quatRotation[2],
-
-        splats[vIndex + 4] = vecPosition[0],
-        splats[vIndex + 5] = vecPosition[1],
-        splats[vIndex + 6] = vecPosition[2],
+        // position
+        splats[vIndex + 0] = vecPosition[0];
+        splats[vIndex + 1] = vecPosition[1];
+        splats[vIndex + 2] = vecPosition[2];
+        splats[vIndex + 3] = sigmoid(this.readValue(dataView, i, "opacity"));
         
-        splats[vIndex + 7] = sigmoid(this.readValue(dataView, i, "opacity")), 
-
-        splats[vIndex + 8] = Math.exp(this.readValue(dataView, i, "scale_0")),
-        splats[vIndex + 9] = Math.exp(this.readValue(dataView, i, "scale_1")),
-        splats[vIndex + 10] = Math.exp(this.readValue(dataView, i, "scale_2")),
-        splats[vIndex + 11] = 0
-
+        // cov3d
+        splats[vIndex + 4] = matCov3d[0]; // m00
+        splats[vIndex + 5] = matCov3d[4]; // m11
+        splats[vIndex + 6] = matCov3d[8]; // m22
+        splats[vIndex + 7] = Date.now() - this.initTime; // time for initial animation
+        splats[vIndex + 8] = matCov3d[3]; // m10
+        splats[vIndex + 9] = matCov3d[6]; // m20
+        splats[vIndex + 10] = matCov3d[7]; // m21
+        splats[vIndex + 11] = 0;
+        
         // sh coefficients
         splats[vIndex + 12] = this.readValue(dataView, i, "f_dc_0")
         splats[vIndex + 13] = this.readValue(dataView, i, "f_dc_1")
@@ -191,18 +212,10 @@ export class Loader extends EventTarget {
         splats[vIndex + 15] = 0
 
         for (let j = 0; j < 15; j++) {
-          // splats[vIndex + 16 + j * 4] = this.readValue(dataView, i, `f_rest_${j * 3 + 0}`)
-          // splats[vIndex + 17 + j * 4] = this.readValue(dataView, i, `f_rest_${j * 3 + 1}`)
-          // splats[vIndex + 18 + j * 4] = this.readValue(dataView, i, `f_rest_${j * 3 + 2}`)
-          splats[vIndex + 16 + j * 4] = this.readValue(dataView, i, `f_rest_${j}`)
-          splats[vIndex + 17 + j * 4] = this.readValue(dataView, i, `f_rest_${j + 15}`)
-          splats[vIndex + 18 + j * 4] = this.readValue(dataView, i, `f_rest_${j + 30}`)
-          splats[vIndex + 19 + j * 4] = 0
-
-          if (i < 2 && this.processedSplats === 0) {
-           console.log(i, `f_rest_${j * 3 + 0}`, `f_rest_${j * 3 + 1}`, `f_rest_${j * 3 + 2}`);
-           console.log(i, vIndex + 16 + j * 4, vIndex + 17 + j * 4, vIndex + 18 + j * 4);
-          }
+          const k = i * bytesPerSplatIn
+          splats[vIndex + 16 + j * 4] = dataView.getFloat32(k + fcRestByteOffsets[j], true);
+          splats[vIndex + 17 + j * 4] = dataView.getFloat32(k + fcRestByteOffsets[j + 15], true);
+          splats[vIndex + 18 + j * 4] = dataView.getFloat32(k + fcRestByteOffsets[j + 30],true);
         }
       }
     }

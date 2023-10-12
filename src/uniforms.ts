@@ -8,21 +8,25 @@ import { mat4, vec3 } from "gl-matrix";
 //     splat_size: f32, 51
 //     screen: vec2f, 52
 //     num_splats: u32, 54
+//     time: f32, 55
 // };
 
 export class Uniforms extends EventTarget {
   private device: GPUDevice;
   private dirty = false;
-  private numValues = 16 + 16 + 16 + 3 + 1 + 2 + 1 + 1; // last "1" ist for alignment
+  private numValues = 16 + 16 + 16 + 3 + 1 + 2 + 1 + 1 + 4; // last "1" ist for alignment
   private typedArray = new Float32Array(this.numValues);
+  private initTime: number;
   buffer?: GPUBuffer;
 
-  constructor({ device }: { device: GPUDevice }) {
+  constructor({ device, initTime }: { device: GPUDevice; initTime: number }) {
     super();
     this.device = device;
+    this.initTime = initTime;
 
     const loop = () => {
       if (this.dirty && this.buffer) {
+        this.setTime();
         device.queue.writeBuffer(this.buffer, 0, this.typedArray);
         this.dirty = false;
         this.dispatchEvent(new Event("change"));
@@ -84,6 +88,11 @@ export class Uniforms extends EventTarget {
   set numShDegrees(v: number) {
     const u32array = new Uint32Array(this.typedArray.buffer);
     u32array.set([v], 55);
+    this.dirty = true;
+  }
+
+  setTime() {
+    this.typedArray.set([Date.now() - this.initTime], 56);
     this.dirty = true;
   }
 }

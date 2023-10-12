@@ -8,15 +8,16 @@ import { Uniforms } from "./uniforms";
 import { Sorter } from "./sorter/sorter";
 import { Pane } from "./pane";
 
+const initTime = Date.now();
 let renderer: Renderer = new Renderer("canvas");
 await renderer.init();
-let uniforms: Uniforms = new Uniforms({ device: renderer.device! });
+let uniforms: Uniforms = new Uniforms({ device: renderer.device!, initTime });
 const sorter = new Sorter();
 const camera = new OrbitCamera({
   position: vec3.fromValues(-5, 0, 0),
   lookAt: vec3.fromValues(0, -1, -0.2),
 });
-const loader = new Loader("/truck/point_cloud2.ply");
+const loader = new Loader("/garden/point_cloud2.ply", initTime);
 new Pane(uniforms, camera);
 
 let splats: Splats | null = null;
@@ -40,7 +41,7 @@ async function start() {
   });
 
   loader.addEventListener("end", async () => {
-    await sorter.init(loader.attributes.splats, 4, loader.floatsPerSplatOut);
+    await sorter.init(loader.attributes.splats, 0, loader.floatsPerSplatOut);
     sort();
   });
 
