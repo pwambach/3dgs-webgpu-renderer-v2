@@ -9,19 +9,17 @@
     "preview": "vite preview"
   },
   "devDependencies": {
-    "@types/lodash.debounce": "^4.0.7",
     "@webgpu/types": "^0.1.34",
     "typescript": "^5.0.2",
     "vite": "^4.4.5"
   },
   "dependencies": {
-    "@duckdb/duckdb-wasm": "^1.27.1-dev120.0",
-    "@loaders.gl/core": "^3.4.14",
-    "@loaders.gl/ply": "^3.4.14",
-    "apache-arrow": "^13.0.0",
+    "fast-sort": "^3.4.0",
     "gl-matrix": "^3.4.3",
-    "lodash.debounce": "^4.0.8",
     "orbit-controls": "^1.2.4",
     "tweakpane": "^4.0.1"
-  }
+  },
+  "browserslist": [
+    "last 2 Chrome versions"
+  ]
 }

@@ -1,4 +1,4 @@
-import debounce from "lodash.debounce";
+// import debounce from "lodash.debounce";
 import { Loader } from "./loader/loader";
 import { Renderer } from "./renderer/renderer";
 import { OrbitCamera } from "./orbit-camera";
@@ -12,18 +12,17 @@ const initTime = Date.now();
 let renderer: Renderer = new Renderer("canvas");
 await renderer.init();
 let uniforms: Uniforms = new Uniforms({ device: renderer.device!, initTime });
-const sorter = new Sorter();
 const camera = new OrbitCamera({
   position: vec3.fromValues(-5, 0, 0),
   lookAt: vec3.fromValues(0, -1, -0.2),
 });
-const loader = new Loader("/garden/point_cloud2.ply", initTime);
+const loader = new Loader("/truck/point_cloud.ply", initTime);
 new Pane(uniforms, camera);
 
 let splats: Splats | null = null;
 
 async function start() {
-  uniforms.modelMatrix = mat4.fromXRotation(mat4.create(), -0.5);
+  uniforms.modelMatrix = mat4.fromXRotation(mat4.create(), -0.1);
   uniforms.viewMatrix = camera.getViewMatrix();
   uniforms.projectionMatrix = camera.getProjectionMatrix();
   uniforms.cameraPos = camera.controls.position;
@@ -38,11 +37,23 @@ async function start() {
 
     splats!.uploadStorage(e.detail.info.byteStart, e.detail.info.byteEnd);
     renderer.draw(loader.processedSplats);
+    uniforms.setTime();
   });
 
   loader.addEventListener("end", async () => {
-    await sorter.init(loader.attributes.splats, 0, loader.floatsPerSplatOut);
-    sort();
+    const sorter = new Sorter(
+      loader.attributes.splats,
+      loader.floatsPerSplatOut
+    );
+    sorter.addEventListener("sorted", () => {
+      splats?.uploadIndices(sorter.output);
+      renderer.draw(loader.processedSplats);
+    });
+    const loop = () => {
+      sorter.update(camera.controls.position);
+      requestAnimationFrame(loop);
+    };
+    loop();
   });
 
   // on camera change
@@ -62,21 +73,6 @@ async function start() {
       renderer.draw(loader.processedSplats);
     });
   });
-
-  // sort on camera change
-  function sort() {
-    if (sorter.output.length === 0) {
-      return;
-    }
-    sorter
-      .sortByDistance(camera.controls.position as [number, number, number])
-      .then((sortedIndices) => {
-        splats?.uploadIndices(sortedIndices);
-        renderer.draw(loader.processedSplats);
-      });
-  }
-  const debouncedSort = debounce(sort, 500, { maxWait: 2000 });
-  camera.addEventListener("change", debouncedSort);
 
   // window resize listener
   window.addEventListener("resize", () => {

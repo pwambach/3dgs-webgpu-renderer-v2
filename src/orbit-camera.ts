@@ -1,4 +1,5 @@
 import { vec3, mat4 } from "gl-matrix";
+// @ts-ignore
 import orbitControls from "orbit-controls";
 
 export class OrbitCamera extends EventTarget {

@@ -1,26 +1,69 @@
-import { loadIntoDB, sortByDistance } from "./duckdb";
+import { vec3 } from "gl-matrix";
+import WorkerUrl from "./worker?url";
 
-export class Sorter {
-  output = new Uint32Array();
+export class Sorter extends EventTarget {
+  indices: Uint32Array;
+  output: Uint32Array;
+  splats: Float32Array;
+  stride: number;
+  isSorting = false;
+  prevCameraPosition = vec3.create();
+  worker = new Worker(WorkerUrl);
+  time = 0;
 
-  async init(splats: Float32Array, offset: number, stride: number) {
-    await loadIntoDB(splats, offset, stride);
+  constructor(splats: Float32Array, stride: number) {
+    super();
+    this.splats = splats;
+    this.stride = stride;
     this.output = new Uint32Array((splats.length / stride) * 6);
-  }
+    this.indices = new Uint32Array(splats.length / stride);
 
-  async sortByDistance(position: [x: number, y: number, z: number]) {
-    const sortedIndices = await sortByDistance(position);
-    const splatCount = this.output.length / 6;
-
-    for (let i = 0; i < sortedIndices.length; i++) {
-      this.output[i * 6 + 0] = sortedIndices[i];
-      this.output[i * 6 + 1] = sortedIndices[i] + splatCount;
-      this.output[i * 6 + 2] = sortedIndices[i] + splatCount * 2;
-      this.output[i * 6 + 3] = sortedIndices[i] + splatCount * 3;
-      this.output[i * 6 + 4] = sortedIndices[i] + splatCount * 4;
-      this.output[i * 6 + 5] = sortedIndices[i] + splatCount * 5;
+    for (let i = 0; i < this.indices.length; i++) {
+      this.indices[i] = i;
     }
 
-    return this.output;
+    this.worker.onmessage = (e) => {
+      console.log(`worker took ${Date.now() - this.time}ms to sort`);
+
+      this.indices = e.data[0];
+      this.output = e.data[1];
+      this.splats = e.data[2];
+      this.isSorting = false;
+      this.dispatchEvent(new Event("sorted"));
+    };
+
+    this.worker.onerror = (e) => {
+      console.log("Worker Error", e);
+    };
+  }
+
+  update(cameraPosition: vec3) {
+    if (this.isSorting) {
+      return;
+    }
+
+    const cameraChanged = !vec3.equals(this.prevCameraPosition, cameraPosition);
+    // save camera position
+    vec3.copy(this.prevCameraPosition, cameraPosition);
+
+    // if sort needed and not already sorting -> do it
+    if (cameraChanged && !this.isSorting) {
+      this.isSorting = true;
+      this.sort();
+    }
+  }
+
+  private sort() {
+    this.time = Date.now();
+    this.worker.postMessage(
+      [
+        this.indices,
+        this.output,
+        this.splats,
+        this.prevCameraPosition,
+        this.stride,
+      ],
+      [this.indices.buffer, this.output.buffer, this.splats.buffer]
+    );
   }
 }
