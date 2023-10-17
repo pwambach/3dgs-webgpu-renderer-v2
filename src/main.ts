@@ -5,7 +5,7 @@ import { OrbitCamera } from "./orbit-camera";
 import { vec3, mat4 } from "gl-matrix";
 import { Splats } from "./splats";
 import { Uniforms } from "./uniforms";
-import { Sorter } from "./sorter/sorter";
+// import { Sorter } from "./sorter/sorter";
 import { Pane } from "./pane";
 
 const initTime = Date.now();
@@ -16,7 +16,7 @@ const camera = new OrbitCamera({
   position: vec3.fromValues(-5, 0, 0),
   lookAt: vec3.fromValues(0, -1, -0.2),
 });
-const loader = new Loader("/truck/point_cloud.ply", initTime);
+const loader = new Loader("/truck/point_cloud2.ply", initTime);
 new Pane(uniforms, camera);
 
 let splats: Splats | null = null;
@@ -26,6 +26,7 @@ async function start() {
   uniforms.viewMatrix = camera.getViewMatrix();
   uniforms.projectionMatrix = camera.getProjectionMatrix();
   uniforms.cameraPos = camera.controls.position;
+  uniforms.numShDegrees = 3;
 
   let firstChunkLoaded = false;
   loader.load();
@@ -35,25 +36,25 @@ async function start() {
       firstChunkLoaded = true;
     }
 
-    splats!.uploadStorage(e.detail.info.byteStart, e.detail.info.byteEnd);
+    splats!.uploadSplats(e.detail.info.byteStart, e.detail.info.byteEnd);
     renderer.draw(loader.processedSplats);
     uniforms.setTime();
   });
 
   loader.addEventListener("end", async () => {
-    const sorter = new Sorter(
-      loader.attributes.splats,
-      loader.floatsPerSplatOut
-    );
-    sorter.addEventListener("sorted", () => {
-      splats?.uploadIndices(sorter.output);
-      renderer.draw(loader.processedSplats);
-    });
-    const loop = () => {
-      sorter.update(camera.controls.position);
-      requestAnimationFrame(loop);
-    };
-    loop();
+    // const sorter = new Sorter(
+    //   loader.attributes.splats,
+    //   loader.floatsPerSplatOut
+    // );
+    // sorter.addEventListener("sorted", () => {
+    //   splats?.uploadIndices(sorter.output);
+    //   renderer.draw(loader.processedSplats);
+    // });
+    // const loop = () => {
+    //   sorter.update(camera.controls.position);
+    //   requestAnimationFrame(loop);
+    // };
+    // loop();
   });
 
   // on camera change
@@ -90,22 +91,19 @@ function onFirstChunk(detail: any) {
     throw new Error("no uniforms");
   }
 
-  splats = new Splats({
-    device: renderer.device!,
-    vertices: detail.attributes.splats,
-    vertexCount: detail.info.totalSplats,
-  });
-
-  splats.uploadIndices();
-  splats.uploadVertices();
-
   uniforms.numSplats = detail.info.totalSplats;
 
-  renderer.setIndexBuffer(splats.indexBuffer!);
-  renderer.setVertexBuffer(splats.vertexBuffer!);
+  splats = new Splats({
+    device: renderer.device!,
+    splats: detail.attributes.splats,
+    numSplatFloats: loader.floatsPerSplatOut,
+    numOutputFloats: 12,
+  });
+
+  renderer.setVertexBuffer(splats.vertexBuffer);
   renderer.createRenderPipeline();
-  renderer.createBindGroup0(splats.storageBuffer!);
-  renderer.createBindGroup1(uniforms.buffer!);
+  renderer.createBindGroupsData(splats.splatsBuffer, splats.outputBuffer);
+  renderer.createBindGroupUniforms(uniforms.buffer!);
 }
 
 start();

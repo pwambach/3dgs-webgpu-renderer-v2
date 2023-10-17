@@ -1,19 +1,23 @@
 import { getDevice } from "../webgpu";
+import computeCode from "../shaders/compute.wgsl?raw";
 import renderVertexCode from "../shaders/render-vertex.wgsl?raw";
 import renderFragmentCode from "../shaders/render-fragment.wgsl?raw";
 
 export class Renderer {
   private canvas: HTMLCanvasElement | null;
   private ctx: GPUCanvasContext | null;
+  private computeModule?: GPUShaderModule;
   private renderVertexModule?: GPUShaderModule;
   private renderFragmentModule?: GPUShaderModule;
   private canvasFormat?: GPUTextureFormat;
   private renderPipeline?: GPURenderPipeline;
-  private bindGroup0?: GPUBindGroup;
-  private bindGroup0Layout?: GPUBindGroupLayout;
-  private bindGroup1?: GPUBindGroup;
-  private bindGroup1Layout?: GPUBindGroupLayout;
-  private indexBuffer?: GPUBuffer;
+  private computePipeline?: GPUComputePipeline;
+  private bindGroupDataCompute?: GPUBindGroup;
+  private bindGroupDataComputeLayout?: GPUBindGroupLayout;
+  private bindGroupDataRender?: GPUBindGroup;
+  private bindGroupDataRenderLayout?: GPUBindGroupLayout;
+  private bindGroupUniforms?: GPUBindGroup;
+  private bindGroupUniformsLayout?: GPUBindGroupLayout;
   private vertexBuffer?: GPUBuffer;
   private nextDrawCount = 0;
   device?: GPUDevice;
@@ -49,6 +53,11 @@ export class Renderer {
       alphaMode: "opaque",
     });
 
+    this.computeModule = this.device.createShaderModule({
+      label: "compute shader",
+      code: computeCode,
+    });
+
     this.renderVertexModule = this.device.createShaderModule({
       label: "render vertex shader",
       code: renderVertexCode,
@@ -66,10 +75,6 @@ export class Renderer {
     this.vertexBuffer = buffer;
   }
 
-  setIndexBuffer(buffer: GPUBuffer) {
-    this.indexBuffer = buffer;
-  }
-
   createRenderPipeline() {
     if (!this.renderVertexModule || !this.renderFragmentModule) {
       throw new Error("Shader modules not defined");
@@ -84,38 +89,38 @@ export class Renderer {
     }
 
     const vertexBufferLayout: GPUVertexBufferLayout = {
-      arrayStride: 14 * 4,
+      arrayStride: 2 * 4,
       attributes: [
         {
-          format: "float32x4",
+          format: "float32x2",
           offset: 0,
           shaderLocation: 0,
-        },
-        {
-          format: "float32x3",
-          offset: 16,
-          shaderLocation: 1,
-        },
-        {
-          format: "float32",
-          offset: 28,
-          shaderLocation: 2,
-        },
-        {
-          format: "float32x3",
-          offset: 32,
-          shaderLocation: 3,
-        },
-        {
-          format: "float32x3",
-          offset: 44,
-          shaderLocation: 4,
         },
       ],
     };
 
-    this.bindGroup0Layout = this.device.createBindGroupLayout({
-      label: "bind group layout 0",
+    this.bindGroupDataComputeLayout = this.device.createBindGroupLayout({
+      label: "bind group data compute layout",
+      entries: [
+        {
+          binding: 0,
+          visibility: GPUShaderStage.COMPUTE,
+          buffer: {
+            type: "read-only-storage",
+          },
+        },
+        {
+          binding: 1,
+          visibility: GPUShaderStage.COMPUTE,
+          buffer: {
+            type: "storage",
+          },
+        },
+      ],
+    });
+
+    this.bindGroupDataRenderLayout = this.device.createBindGroupLayout({
+      label: "bind group data render layout",
       entries: [
         {
           binding: 0,
@@ -127,12 +132,12 @@ export class Renderer {
       ],
     });
 
-    this.bindGroup1Layout = this.device.createBindGroupLayout({
-      label: "bind group layout 1",
+    this.bindGroupUniformsLayout = this.device.createBindGroupLayout({
+      label: "bind group layout uniforms",
       entries: [
         {
           binding: 0,
-          visibility: GPUShaderStage.VERTEX,
+          visibility: GPUShaderStage.COMPUTE,
           buffer: {
             type: "uniform",
           },
@@ -140,13 +145,26 @@ export class Renderer {
       ],
     });
 
-    const pipelineLayout = this.device.createPipelineLayout({
-      bindGroupLayouts: [this.bindGroup0Layout, this.bindGroup1Layout],
+    this.computePipeline = this.device.createComputePipeline({
+      layout: this.device.createPipelineLayout({
+        bindGroupLayouts: [
+          this.bindGroupDataComputeLayout,
+          this.bindGroupUniformsLayout,
+        ],
+      }),
+      compute: {
+        module: this.computeModule!,
+        entryPoint: "main",
+      },
+    });
+
+    const renderPipelineLayout = this.device.createPipelineLayout({
+      bindGroupLayouts: [this.bindGroupDataRenderLayout],
     });
 
     this.renderPipeline = this.device.createRenderPipeline({
       label: "render pipeline",
-      layout: pipelineLayout,
+      layout: renderPipelineLayout,
       vertex: {
         module: this.renderVertexModule,
         entryPoint: "vertexMain",
@@ -180,31 +198,50 @@ export class Renderer {
     });
   }
 
-  createBindGroup0(storageBuffer: GPUBuffer) {
-    if (!this.device || !this.bindGroup0Layout) {
+  createBindGroupsData(splatsBuffer: GPUBuffer, outputBuffer: GPUBuffer) {
+    if (
+      !this.device ||
+      !this.bindGroupDataComputeLayout ||
+      !this.bindGroupDataRenderLayout
+    ) {
       throw new Error("Device not ready");
     }
 
-    this.bindGroup0 = this.device.createBindGroup({
-      label: "bind group 0",
-      layout: this.bindGroup0Layout,
+    this.bindGroupDataCompute = this.device.createBindGroup({
+      label: "bind group data compute",
+      layout: this.bindGroupDataComputeLayout,
       entries: [
         {
           binding: 0,
-          resource: { buffer: storageBuffer },
+          resource: { buffer: splatsBuffer },
+        },
+        {
+          binding: 1,
+          resource: { buffer: outputBuffer },
+        },
+      ],
+    });
+
+    this.bindGroupDataRender = this.device.createBindGroup({
+      label: "bind group data render",
+      layout: this.bindGroupDataRenderLayout,
+      entries: [
+        {
+          binding: 0,
+          resource: { buffer: outputBuffer },
         },
       ],
     });
   }
 
-  createBindGroup1(uniformsBuffer: GPUBuffer) {
-    if (!this.device || !this.bindGroup1Layout) {
+  createBindGroupUniforms(uniformsBuffer: GPUBuffer) {
+    if (!this.device || !this.bindGroupUniformsLayout) {
       throw new Error("Device not ready");
     }
 
-    this.bindGroup1 = this.device.createBindGroup({
-      label: "bind group 1",
-      layout: this.bindGroup1Layout,
+    this.bindGroupUniforms = this.device.createBindGroup({
+      label: "bind group uniforms",
+      layout: this.bindGroupUniformsLayout,
       entries: [
         {
           binding: 0,
@@ -236,15 +273,24 @@ export class Renderer {
       !this.device ||
       !this.ctx ||
       !this.renderPipeline ||
-      !this.vertexBuffer ||
-      !this.indexBuffer
+      !this.computePipeline ||
+      !this.vertexBuffer
     ) {
       return;
     }
 
     const encoder = this.device.createCommandEncoder();
 
-    const pass = encoder.beginRenderPass({
+    const computePass = encoder.beginComputePass({});
+    computePass.setPipeline(this.computePipeline);
+    computePass.setBindGroup(0, this.bindGroupDataCompute!);
+    computePass.setBindGroup(1, this.bindGroupUniforms!);
+    const workgroupCountX = Math.ceil(Math.sqrt(count) / 8);
+    const workgroupCountY = Math.ceil(Math.sqrt(count) / 8);
+    computePass.dispatchWorkgroups(workgroupCountX, workgroupCountY);
+    computePass.end();
+
+    const renderPass = encoder.beginRenderPass({
       colorAttachments: [
         {
           view: this.ctx.getCurrentTexture().createView(),
@@ -255,13 +301,12 @@ export class Renderer {
       ],
     });
 
-    pass.setPipeline(this.renderPipeline);
-    pass.setVertexBuffer(0, this.vertexBuffer);
-    pass.setIndexBuffer(this.indexBuffer, "uint32");
-    pass.setBindGroup(0, this.bindGroup0!);
-    pass.setBindGroup(1, this.bindGroup1!);
-    pass.drawIndexed(count * 6);
-    pass.end();
+    renderPass.setPipeline(this.renderPipeline);
+    renderPass.setVertexBuffer(0, this.vertexBuffer);
+    renderPass.setBindGroup(0, this.bindGroupDataRender!);
+    // renderPass.setBindGroup(1, this.bindGroupUniforms!);
+    renderPass.draw(6, count);
+    renderPass.end();
 
     this.device.queue.submit([encoder.finish()]);
   }

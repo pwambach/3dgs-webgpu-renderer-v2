@@ -14,7 +14,6 @@
     "vite": "^4.4.5"
   },
   "dependencies": {
-    "fast-sort": "^3.4.0",
     "gl-matrix": "^3.4.3",
     "orbit-controls": "^1.2.4",
     "tweakpane": "^4.0.1"

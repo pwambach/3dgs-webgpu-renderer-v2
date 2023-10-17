@@ -1,111 +1,77 @@
 export class Splats {
   private device: GPUDevice;
-  private typedArrayVertices = new Float32Array();
-  private typedArrayIndices = new Uint32Array();
-  private typedArrayStorage = new Float32Array();
-  vertexBuffer: GPUBuffer | null = null;
-  indexBuffer: GPUBuffer | null = null;
-  storageBuffer: GPUBuffer | null = null;
-  vertexBufferLayout: GPUVertexBufferLayout | null = null;
+  private typedArraySplats = new Float32Array();
+  vertexBuffer: GPUBuffer;
+  splatsBuffer: GPUBuffer;
+  outputBuffer: GPUBuffer;
 
-  // struct Vertex {
-  //   rotation: vec4f,
+  // struct Splat {
+  //  position: vec3f,
+  //  opacity: f32,
+  //  cov3d1: vec3f,
+  //  load_time: f32,
+  //  cov3d2: vec3f,
+  //  sh: array<vec3f, 16>
+  // }
+
+  // struct RenderOutput {
   //   position: vec3f,
   //   opacity: f32,
-  //   scale: vec3f,
-  //   sh: vec3f
+  //   v1: vec2f,
+  //   v2: vec2f,
+  //   color: vec3f,
   // }
 
   constructor({
     device,
-    vertices,
-    vertexCount,
+    splats,
+    numSplatFloats,
+    numOutputFloats,
   }: {
     device: GPUDevice;
-    vertices: Float32Array;
-    vertexCount: number;
+    splats: Float32Array;
+    numSplatFloats: number;
+    numOutputFloats: number;
   }) {
     this.device = device;
-    this.typedArrayVertices = new Float32Array(vertexCount * 6); // for 6 quad points;
-    this.typedArrayIndices = new Uint32Array(vertexCount * 6); // for 6 quad points
-    this.typedArrayStorage = vertices;
-    this.createVertexBuffer();
-    this.createIndexBuffer();
-    this.createStorageBuffer();
-  }
+    this.typedArraySplats = splats;
 
-  createVertexBuffer() {
+    // vertex buffer
+    const array = new Float32Array([1, -1, 1, 1, -1, -1, 1, 1, -1, -1, -1, 1]);
     this.vertexBuffer = this.device.createBuffer({
       label: "vertices",
-      size: this.typedArrayVertices.byteLength,
+      size: array.byteLength,
       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
     });
 
-    for (let i = 0; i < this.typedArrayVertices.length; i++) {
-      this.typedArrayVertices[i] = 1;
-    }
-  }
+    this.device.queue.writeBuffer(this.vertexBuffer, 0, array);
 
-  createIndexBuffer() {
-    this.indexBuffer = this.device.createBuffer({
-      label: "indices",
-      size: this.typedArrayIndices.byteLength,
-      usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
+    // splats buffer
+    this.splatsBuffer = this.device.createBuffer({
+      label: "splats buffer",
+      size: this.typedArraySplats.byteLength,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
     });
 
-    const totalVertices = this.typedArrayIndices.length / 6;
-
-    for (let i = 0; i < totalVertices; i++) {
-      for (let j = 0; j < 6; j++) {
-        this.typedArrayIndices[i * 6 + j] = j * totalVertices + i;
-      }
-    }
-  }
-
-  createStorageBuffer() {
-    this.storageBuffer = this.device.createBuffer({
-      label: "storage",
-      size: this.typedArrayStorage.byteLength,
+    // output buffer
+    this.outputBuffer = this.device.createBuffer({
+      label: "output buffer",
+      size:
+        (this.typedArraySplats.byteLength / numSplatFloats) * numOutputFloats,
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
     });
   }
 
-  uploadVertices() {
-    if (!this.vertexBuffer) {
-      console.warn("Vertex buffer not set.");
-      return;
-    }
-
-    this.device.queue.writeBuffer(
-      this.vertexBuffer,
-      0,
-      this.typedArrayVertices
-    );
-  }
-
-  uploadIndices(indices?: Uint32Array) {
-    if (!this.indexBuffer) {
-      console.warn("Index buffer not set.");
-      return;
-    }
-
-    if (indices) {
-      this.typedArrayIndices = indices;
-    }
-
-    this.device.queue.writeBuffer(this.indexBuffer, 0, this.typedArrayIndices);
-  }
-
-  uploadStorage(byteStart: number, byteEnd: number) {
-    if (!this.storageBuffer) {
+  uploadSplats(byteStart: number, byteEnd: number) {
+    if (!this.splatsBuffer) {
       console.warn("Storage buffer not set.");
       return;
     }
 
     this.device.queue.writeBuffer(
-      this.storageBuffer,
+      this.splatsBuffer,
       byteStart,
-      this.typedArrayStorage,
+      this.typedArraySplats,
       byteStart / Float32Array.BYTES_PER_ELEMENT,
       (byteEnd - byteStart) / Float32Array.BYTES_PER_ELEMENT
     );
