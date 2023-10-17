@@ -3,7 +3,6 @@ import WorkerUrl from "./worker?url";
 
 export class Sorter extends EventTarget {
   indices: Uint32Array;
-  output: Uint32Array;
   splats: Float32Array;
   stride: number;
   isSorting = false;
@@ -15,7 +14,6 @@ export class Sorter extends EventTarget {
     super();
     this.splats = splats;
     this.stride = stride;
-    this.output = new Uint32Array((splats.length / stride) * 6);
     this.indices = new Uint32Array(splats.length / stride);
 
     for (let i = 0; i < this.indices.length; i++) {
@@ -26,8 +24,7 @@ export class Sorter extends EventTarget {
       console.log(`worker took ${Date.now() - this.time}ms to sort`);
 
       this.indices = e.data[0];
-      this.output = e.data[1];
-      this.splats = e.data[2];
+      this.splats = e.data[1];
       this.isSorting = false;
       this.dispatchEvent(new Event("sorted"));
     };
@@ -56,14 +53,8 @@ export class Sorter extends EventTarget {
   private sort() {
     this.time = Date.now();
     this.worker.postMessage(
-      [
-        this.indices,
-        this.output,
-        this.splats,
-        this.prevCameraPosition,
-        this.stride,
-      ],
-      [this.indices.buffer, this.output.buffer, this.splats.buffer]
+      [this.indices, this.splats, this.prevCameraPosition, this.stride],
+      [this.indices.buffer, this.splats.buffer]
     );
   }
 }

@@ -30,9 +30,10 @@ struct Uniforms {
 
 @group(0) @binding(0) var<storage, read> splats: array<Splat>;
 @group(0) @binding(1) var<storage, read_write> output: array<RenderData>;
-@group(1) @binding(0) var<uniform> uniforms: Uniforms;
+@group(1) @binding(0) var<storage, read> sort_indices: array<u32>;
+@group(2) @binding(0) var<uniform> uniforms: Uniforms;
 
-@compute @workgroup_size(8, 8)
+@compute @workgroup_size(64, 1)
 fn main(
     @builtin(workgroup_id) workgroup_id : vec3<u32>,
     @builtin(num_workgroups) num_workgroups: vec3<u32>,
@@ -44,10 +45,17 @@ fn main(
         workgroup_id.z * num_workgroups.x * num_workgroups.y;
     let global_invocation_index = workgroup_index * 64 + local_invocation_index;
 
-    // if (global_invocation_index > 2541225) {
-    //     return;
-    // }
+    if (global_invocation_index >= uniforms.num_splats) {
+        var data: RenderData;
+        data.position = vec3(9,9,9);
+        data.v1 = vec2f(0);
+        data.v2 = vec2f(0);
+        data.m = vec2f(0);
+        output[global_invocation_index] = data;
+        return;
+    }
 
+    var sorted_index: u32 = sort_indices[global_invocation_index];
     var splat = splats[global_invocation_index];
 
      // get the clip position of the center of the splat 
@@ -83,7 +91,6 @@ fn main(
     
     output[global_invocation_index] = data;
 }
-
 
 
 // main parts from https://github.com/aras-p/UnityGaussianSplatting/tree/main

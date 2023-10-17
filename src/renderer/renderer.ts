@@ -13,6 +13,8 @@ export class Renderer {
   private renderPipeline?: GPURenderPipeline;
   private computePipeline?: GPUComputePipeline;
   private bindGroupDataCompute?: GPUBindGroup;
+  private bindGroupSort?: GPUBindGroup;
+  private bindGroupSortLayout?: GPUBindGroupLayout;
   private bindGroupDataComputeLayout?: GPUBindGroupLayout;
   private bindGroupDataRender?: GPUBindGroup;
   private bindGroupDataRenderLayout?: GPUBindGroupLayout;
@@ -119,6 +121,19 @@ export class Renderer {
       ],
     });
 
+    this.bindGroupSortLayout = this.device.createBindGroupLayout({
+      label: "bind group sort layout",
+      entries: [
+        {
+          binding: 0,
+          visibility: GPUShaderStage.COMPUTE,
+          buffer: {
+            type: "read-only-storage",
+          },
+        },
+      ],
+    });
+
     this.bindGroupDataRenderLayout = this.device.createBindGroupLayout({
       label: "bind group data render layout",
       entries: [
@@ -149,6 +164,7 @@ export class Renderer {
       layout: this.device.createPipelineLayout({
         bindGroupLayouts: [
           this.bindGroupDataComputeLayout,
+          this.bindGroupSortLayout,
           this.bindGroupUniformsLayout,
         ],
       }),
@@ -198,11 +214,16 @@ export class Renderer {
     });
   }
 
-  createBindGroupsData(splatsBuffer: GPUBuffer, outputBuffer: GPUBuffer) {
+  createBindGroupsData(
+    splatsBuffer: GPUBuffer,
+    outputBuffer: GPUBuffer,
+    sortBuffer: GPUBuffer
+  ) {
     if (
       !this.device ||
       !this.bindGroupDataComputeLayout ||
-      !this.bindGroupDataRenderLayout
+      !this.bindGroupDataRenderLayout ||
+      !this.bindGroupSortLayout
     ) {
       throw new Error("Device not ready");
     }
@@ -218,6 +239,17 @@ export class Renderer {
         {
           binding: 1,
           resource: { buffer: outputBuffer },
+        },
+      ],
+    });
+
+    this.bindGroupSort = this.device.createBindGroup({
+      label: "bind group sort",
+      layout: this.bindGroupSortLayout,
+      entries: [
+        {
+          binding: 0,
+          resource: { buffer: sortBuffer },
         },
       ],
     });
@@ -284,10 +316,11 @@ export class Renderer {
     const computePass = encoder.beginComputePass({});
     computePass.setPipeline(this.computePipeline);
     computePass.setBindGroup(0, this.bindGroupDataCompute!);
-    computePass.setBindGroup(1, this.bindGroupUniforms!);
-    const workgroupCountX = Math.ceil(Math.sqrt(count) / 8);
-    const workgroupCountY = Math.ceil(Math.sqrt(count) / 8);
-    computePass.dispatchWorkgroups(workgroupCountX, workgroupCountY);
+    computePass.setBindGroup(1, this.bindGroupSort!);
+    computePass.setBindGroup(2, this.bindGroupUniforms!);
+    // const workgroupCountX = Math.ceil(Math.sqrt(count) / 8);
+    // const workgroupCountY = Math.ceil(Math.sqrt(count) / 8);
+    computePass.dispatchWorkgroups(count / 64, 1);
     computePass.end();
 
     const renderPass = encoder.beginRenderPass({
@@ -304,7 +337,6 @@ export class Renderer {
     renderPass.setPipeline(this.renderPipeline);
     renderPass.setVertexBuffer(0, this.vertexBuffer);
     renderPass.setBindGroup(0, this.bindGroupDataRender!);
-    // renderPass.setBindGroup(1, this.bindGroupUniforms!);
     renderPass.draw(6, count);
     renderPass.end();
 

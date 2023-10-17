@@ -3,6 +3,7 @@ export class Splats {
   private typedArraySplats = new Float32Array();
   vertexBuffer: GPUBuffer;
   splatsBuffer: GPUBuffer;
+  sortBuffer: GPUBuffer;
   outputBuffer: GPUBuffer;
 
   // struct Splat {
@@ -37,14 +38,16 @@ export class Splats {
     this.typedArraySplats = splats;
 
     // vertex buffer
-    const array = new Float32Array([1, -1, 1, 1, -1, -1, 1, 1, -1, -1, -1, 1]);
+    const vertices = new Float32Array([
+      1, -1, 1, 1, -1, -1, 1, 1, -1, -1, -1, 1,
+    ]);
     this.vertexBuffer = this.device.createBuffer({
       label: "vertices",
-      size: array.byteLength,
+      size: vertices.byteLength,
       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
     });
 
-    this.device.queue.writeBuffer(this.vertexBuffer, 0, array);
+    this.device.queue.writeBuffer(this.vertexBuffer, 0, vertices);
 
     // splats buffer
     this.splatsBuffer = this.device.createBuffer({
@@ -53,21 +56,31 @@ export class Splats {
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
     });
 
+    const splatCount = this.typedArraySplats.length / numSplatFloats;
+
     // output buffer
     this.outputBuffer = this.device.createBuffer({
       label: "output buffer",
-      size:
-        (this.typedArraySplats.byteLength / numSplatFloats) * numOutputFloats,
+      size: splatCount * numOutputFloats * Float32Array.BYTES_PER_ELEMENT,
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
     });
+
+    const tmp = new Uint32Array(splatCount);
+    for (let i = 0; i < tmp.length; i++) {
+      tmp[i] = i;
+    }
+
+    // sort buffer
+    this.sortBuffer = this.device.createBuffer({
+      label: "sort buffer",
+      size: tmp.byteLength,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    });
+
+    this.uploadSort(tmp);
   }
 
   uploadSplats(byteStart: number, byteEnd: number) {
-    if (!this.splatsBuffer) {
-      console.warn("Storage buffer not set.");
-      return;
-    }
-
     this.device.queue.writeBuffer(
       this.splatsBuffer,
       byteStart,
@@ -75,5 +88,9 @@ export class Splats {
       byteStart / Float32Array.BYTES_PER_ELEMENT,
       (byteEnd - byteStart) / Float32Array.BYTES_PER_ELEMENT
     );
+  }
+
+  uploadSort(values: Uint32Array) {
+    this.device.queue.writeBuffer(this.sortBuffer, 0, values);
   }
 }

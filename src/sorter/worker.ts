@@ -4,13 +4,13 @@
 
 self.onmessage = (e: Event) => {
   // @ts-ignore
-  let [indices, output, splats, p, stride] = e.data;
+  let [indices, splats, p, stride] = e.data;
 
   // let t = Date.now();
   const [px, py, pz] = p;
   const splatLength = indices.length;
 
-  const tmp = new Float64Array(output.buffer);
+  const tmp = new Float32Array(splatLength);
 
   for (let i = 0; i < splatLength; i++) {
     const j = i * stride + 0;
@@ -33,22 +33,10 @@ self.onmessage = (e: Event) => {
   // console.log("2 sort", Date.now() - t);
   // t = Date.now();
 
-  for (let i = 0; i < splatLength; i++) {
-    const v = indices[i];
-    output[i * 6 + 0] = v + splatLength * 0;
-    output[i * 6 + 1] = v + splatLength * 1;
-    output[i * 6 + 2] = v + splatLength * 2;
-    output[i * 6 + 3] = v + splatLength * 3;
-    output[i * 6 + 4] = v + splatLength * 4;
-    output[i * 6 + 5] = v + splatLength * 5;
-  }
-
-  // console.log("3 fill 2", Date.now() - t);
-
   self.postMessage(
-    [indices, output, splats],
+    [indices, splats],
     // @ts-ignore
-    [indices.buffer, output.buffer, splats.buffer]
+    [indices.buffer, splats.buffer]
   );
 };
 

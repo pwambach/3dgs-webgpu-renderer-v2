@@ -29,7 +29,7 @@ fn vertexMain(
     var output: VertexOut;
     // add bbox offset to splat clip position
     output.position = vec4f(data.position.xy + position, data.position.z, 1);
-    output.color_and_opacity = vec4(data.color, data.opacity);
+    output.color_and_opacity = vec4f(data.color, data.opacity);
     output.uv = offset;
     return output;
 }

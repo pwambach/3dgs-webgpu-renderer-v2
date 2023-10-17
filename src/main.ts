@@ -5,7 +5,7 @@ import { OrbitCamera } from "./orbit-camera";
 import { vec3, mat4 } from "gl-matrix";
 import { Splats } from "./splats";
 import { Uniforms } from "./uniforms";
-// import { Sorter } from "./sorter/sorter";
+import { Sorter } from "./sorter/sorter";
 import { Pane } from "./pane";
 
 const initTime = Date.now();
@@ -16,7 +16,7 @@ const camera = new OrbitCamera({
   position: vec3.fromValues(-5, 0, 0),
   lookAt: vec3.fromValues(0, -1, -0.2),
 });
-const loader = new Loader("/truck/point_cloud2.ply", initTime);
+const loader = new Loader("/truck/point_cloud.ply", initTime);
 new Pane(uniforms, camera);
 
 let splats: Splats | null = null;
@@ -47,7 +47,7 @@ async function start() {
     //   loader.floatsPerSplatOut
     // );
     // sorter.addEventListener("sorted", () => {
-    //   splats?.uploadIndices(sorter.output);
+    //   // splats?.uploadSort(sorter.indices);
     //   renderer.draw(loader.processedSplats);
     // });
     // const loop = () => {
@@ -102,7 +102,11 @@ function onFirstChunk(detail: any) {
 
   renderer.setVertexBuffer(splats.vertexBuffer);
   renderer.createRenderPipeline();
-  renderer.createBindGroupsData(splats.splatsBuffer, splats.outputBuffer);
+  renderer.createBindGroupsData(
+    splats.splatsBuffer,
+    splats.outputBuffer,
+    splats.splatsBuffer
+  );
   renderer.createBindGroupUniforms(uniforms.buffer!);
 }
 
