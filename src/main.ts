@@ -43,6 +43,8 @@ async function start() {
 
   var a = false;
   loader.addEventListener("end", async () => {
+    splats?.uploadSplats(0, 0);
+
     const sorter = new Sorter(
       loader.attributes.splats,
       loader.floatsPerSplatOut

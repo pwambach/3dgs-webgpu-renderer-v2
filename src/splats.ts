@@ -84,6 +84,16 @@ export class Splats {
   }
 
   uploadSplats(byteStart: number, byteEnd: number) {
+    if (byteEnd === 0) {
+      this.device.queue.writeBuffer(
+        this.splatsBuffer,
+        0,
+        this.typedArraySplats,
+        0
+      );
+      return;
+    }
+
     this.device.queue.writeBuffer(
       this.splatsBuffer,
       byteStart,
