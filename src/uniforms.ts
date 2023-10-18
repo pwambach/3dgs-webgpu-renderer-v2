@@ -27,7 +27,7 @@ export class Uniforms extends EventTarget {
 
     const loop = () => {
       if (this.dirty && this.buffer) {
-        // this.setTime();
+        this.setTime();
         device.queue.writeBuffer(this.buffer, 0, this.typedArray);
         this.dirty = false;
         this.dispatchEvent(new Event("change"));
@@ -93,8 +93,7 @@ export class Uniforms extends EventTarget {
   }
 
   setTime() {
-    const x = Date.now() - this.initTime;
-    this.typedArray.set([x], 56);
+    this.typedArray.set([Date.now() - this.initTime], 56);
     this.dirty = true;
   }
 }

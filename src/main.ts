@@ -16,7 +16,7 @@ const camera = new OrbitCamera({
   position: vec3.fromValues(-5, 0, 0),
   lookAt: vec3.fromValues(0, -1, -0.2),
 });
-const loader = new Loader("/truck/point_cloud.ply", initTime);
+const loader = new Loader("/garden/point_cloud2.ply", initTime);
 new Pane(uniforms, camera);
 
 let splats: Splats | null = null;
@@ -41,7 +41,6 @@ async function start() {
     uniforms.setTime();
   });
 
-  var a = false;
   loader.addEventListener("end", async () => {
     splats?.uploadSplats(0, 0);
 
@@ -49,21 +48,12 @@ async function start() {
       loader.attributes.splats,
       loader.floatsPerSplatOut
     );
+
     sorter.addEventListener("sorted", () => {
-      if (!a) {
-        // splats?.uploadSort(sorter.indices);
-        renderer.draw(loader.processedSplats);
-        const x = new Uint32Array(sorter.indices.length);
-        for (let i = 0; i < x.length; i++) {
-          x[i] = sorter.indices[i];
-        }
-
-        a = true;
-        // console.log(x);
-      }
-
-      // renderer.draw(loader.processedSplats);
+      splats?.uploadSort(sorter.indices);
+      renderer.draw(loader.processedSplats);
     });
+
     const loop = () => {
       sorter.update(camera.controls.position);
       requestAnimationFrame(loop);
@@ -105,13 +95,13 @@ function onFirstChunk(detail: any) {
     throw new Error("no uniforms");
   }
 
-  uniforms.numSplats = detail.info.totalSplats;
+  uniforms.numSplats = loader.splatCount;
 
   splats = new Splats({
     device: renderer.device!,
     splats: detail.attributes.splats,
     numSplatFloats: loader.floatsPerSplatOut,
-    numOutputFloats: 12,
+    numOutputFloats: 16,
   });
 
   renderer.setVertexBuffer(splats.vertexBuffer);

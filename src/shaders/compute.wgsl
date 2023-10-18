@@ -33,7 +33,7 @@ struct Uniforms {
 @group(1) @binding(0) var<storage, read> sort_indices: array<u32>;
 @group(2) @binding(0) var<uniform> uniforms: Uniforms;
 
-@compute @workgroup_size(64)
+@compute @workgroup_size(8,8)
 fn main(
     @builtin(workgroup_id) workgroup_id : vec3<u32>,
     @builtin(num_workgroups) num_workgroups: vec3<u32>,
@@ -45,11 +45,11 @@ fn main(
     //     workgroup_id.y * num_workgroups.x +
     //     workgroup_id.z * num_workgroups.x * num_workgroups.y;
 
-    // let workgroup_index = workgroup_id.x * 64 + workgroup_id.y;
+    let workgroup_index = workgroup_id.x * num_workgroups.x + workgroup_id.y;
 
-    let global_invocation_index = global_invocation_id.x;
+    let global_invocation_index = workgroup_index * 64 + local_invocation_index;
 
-    if (global_invocation_index >= 880000) {
+    if (global_invocation_index >= uniforms.num_splats) {
         var data: RenderData;
         data.position = vec3(9,9,9);
         data.v1 = vec2f(0);
@@ -82,7 +82,7 @@ fn main(
     var v2 = normalize(vec2f(v1.y, -v1.x)) * sqrt(l2);
 
     // get the quad vertice from both eigenvectors 
-    var m = 6 / uniforms.screen * uniforms.splat_size * saturate(max(0, uniforms.time - splat.load_time) / 1000); // not 100% sure why * 6 fits
+    var m = 6 / uniforms.screen * uniforms.splat_size * 1;//saturate(max(0, uniforms.time - splat.load_time) / 1000); // not 100% sure why * 6 fits
 
     // set outputs
     var data: RenderData;
