@@ -7,8 +7,9 @@ import { mat4, vec3 } from "gl-matrix";
 //     camera_pos: vec3f, 48
 //     splat_size: f32, 51
 //     screen: vec2f, 52
-//     num_splats: u32, 54
-//     time: f32, 55
+//     num_splats: u32, 54,
+//     num_sh_degrees: u32, 55
+//     time: f32, 56
 // };
 
 export class Uniforms extends EventTarget {
@@ -26,7 +27,7 @@ export class Uniforms extends EventTarget {
 
     const loop = () => {
       if (this.dirty && this.buffer) {
-        this.setTime();
+        // this.setTime();
         device.queue.writeBuffer(this.buffer, 0, this.typedArray);
         this.dirty = false;
         this.dispatchEvent(new Event("change"));
@@ -92,7 +93,8 @@ export class Uniforms extends EventTarget {
   }
 
   setTime() {
-    this.typedArray.set([Date.now() - this.initTime], 56);
+    const x = Date.now() - this.initTime;
+    this.typedArray.set([x], 56);
     this.dirty = true;
   }
 }

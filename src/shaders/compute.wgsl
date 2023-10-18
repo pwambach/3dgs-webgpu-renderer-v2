@@ -33,19 +33,23 @@ struct Uniforms {
 @group(1) @binding(0) var<storage, read> sort_indices: array<u32>;
 @group(2) @binding(0) var<uniform> uniforms: Uniforms;
 
-@compute @workgroup_size(64, 1)
+@compute @workgroup_size(64)
 fn main(
     @builtin(workgroup_id) workgroup_id : vec3<u32>,
     @builtin(num_workgroups) num_workgroups: vec3<u32>,
     @builtin(local_invocation_index) local_invocation_index: u32,
+    @builtin(global_invocation_id) global_invocation_id: vec3<u32>,
     ) {
-    let workgroup_index =  
-        workgroup_id.x +
-        workgroup_id.y * num_workgroups.x +
-        workgroup_id.z * num_workgroups.x * num_workgroups.y;
-    let global_invocation_index = workgroup_index * 64 + local_invocation_index;
+    // let workgroup_index =  
+    //     workgroup_id.x +
+    //     workgroup_id.y * num_workgroups.x +
+    //     workgroup_id.z * num_workgroups.x * num_workgroups.y;
 
-    if (global_invocation_index >= uniforms.num_splats) {
+    // let workgroup_index = workgroup_id.x * 64 + workgroup_id.y;
+
+    let global_invocation_index = global_invocation_id.x;
+
+    if (global_invocation_index >= 880000) {
         var data: RenderData;
         data.position = vec3(9,9,9);
         data.v1 = vec2f(0);
@@ -56,7 +60,7 @@ fn main(
     }
 
     var sorted_index: u32 = sort_indices[global_invocation_index];
-    var splat = splats[global_invocation_index];
+    var splat = splats[sorted_index];
 
      // get the clip position of the center of the splat 
     var clip_position = uniforms.proj_matrix * uniforms.view_matrix * uniforms.model_matrix * vec4f(splat.position, 1);

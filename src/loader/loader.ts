@@ -153,7 +153,8 @@ export class Loader extends EventTarget {
     const matCov3d = mat3.create();
 
     for (let i = 0; i < numSplatsToExtract; i++) {
-      const vIndex = (this.processedSplats + i) * this.floatsPerSplatOut;
+      const vIndex =
+        (this.splatCount - this.processedSplats + i) * this.floatsPerSplatOut;
 
       // create position vec3
       vec3.set(

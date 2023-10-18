@@ -313,14 +313,15 @@ export class Renderer {
 
     const encoder = this.device.createCommandEncoder();
 
-    const computePass = encoder.beginComputePass({});
+    const computePass = encoder.beginComputePass();
     computePass.setPipeline(this.computePipeline);
     computePass.setBindGroup(0, this.bindGroupDataCompute!);
     computePass.setBindGroup(1, this.bindGroupSort!);
     computePass.setBindGroup(2, this.bindGroupUniforms!);
     // const workgroupCountX = Math.ceil(Math.sqrt(count) / 8);
     // const workgroupCountY = Math.ceil(Math.sqrt(count) / 8);
-    computePass.dispatchWorkgroups(count / 64, 1);
+    computePass.dispatchWorkgroups(Math.ceil(count / 64));
+
     computePass.end();
 
     const renderPass = encoder.beginRenderPass({

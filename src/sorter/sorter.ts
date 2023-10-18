@@ -21,7 +21,7 @@ export class Sorter extends EventTarget {
     }
 
     this.worker.onmessage = (e) => {
-      console.log(`worker took ${Date.now() - this.time}ms to sort`);
+      // console.log(`worker took ${Date.now() - this.time}ms to sort`);
 
       this.indices = e.data[0];
       this.splats = e.data[1];

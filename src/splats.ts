@@ -67,8 +67,11 @@ export class Splats {
 
     const tmp = new Uint32Array(splatCount);
     for (let i = 0; i < tmp.length; i++) {
+      // tmp[i] = tmp.length - 1 - i;
       tmp[i] = i;
     }
+
+    console.log(tmp);
 
     // sort buffer
     this.sortBuffer = this.device.createBuffer({
@@ -91,6 +94,8 @@ export class Splats {
   }
 
   uploadSort(values: Uint32Array) {
+    console.log({ values });
+
     this.device.queue.writeBuffer(this.sortBuffer, 0, values);
   }
 }

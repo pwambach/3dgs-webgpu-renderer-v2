@@ -41,20 +41,32 @@ async function start() {
     uniforms.setTime();
   });
 
+  var a = false;
   loader.addEventListener("end", async () => {
-    // const sorter = new Sorter(
-    //   loader.attributes.splats,
-    //   loader.floatsPerSplatOut
-    // );
-    // sorter.addEventListener("sorted", () => {
-    //   // splats?.uploadSort(sorter.indices);
-    //   renderer.draw(loader.processedSplats);
-    // });
-    // const loop = () => {
-    //   sorter.update(camera.controls.position);
-    //   requestAnimationFrame(loop);
-    // };
-    // loop();
+    const sorter = new Sorter(
+      loader.attributes.splats,
+      loader.floatsPerSplatOut
+    );
+    sorter.addEventListener("sorted", () => {
+      if (!a) {
+        // splats?.uploadSort(sorter.indices);
+        renderer.draw(loader.processedSplats);
+        const x = new Uint32Array(sorter.indices.length);
+        for (let i = 0; i < x.length; i++) {
+          x[i] = sorter.indices[i];
+        }
+
+        a = true;
+        // console.log(x);
+      }
+
+      // renderer.draw(loader.processedSplats);
+    });
+    const loop = () => {
+      sorter.update(camera.controls.position);
+      requestAnimationFrame(loop);
+    };
+    loop();
   });
 
   // on camera change
@@ -105,7 +117,7 @@ function onFirstChunk(detail: any) {
   renderer.createBindGroupsData(
     splats.splatsBuffer,
     splats.outputBuffer,
-    splats.splatsBuffer
+    splats.sortBuffer
   );
   renderer.createBindGroupUniforms(uniforms.buffer!);
 }
