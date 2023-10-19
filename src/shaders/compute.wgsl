@@ -40,21 +40,11 @@ fn main(
     @builtin(local_invocation_index) local_invocation_index: u32,
     @builtin(global_invocation_id) global_invocation_id: vec3<u32>,
     ) {
-    // let workgroup_index =  
-    //     workgroup_id.x +
-    //     workgroup_id.y * num_workgroups.x +
-    //     workgroup_id.z * num_workgroups.x * num_workgroups.y;
-
     let workgroup_index = workgroup_id.x * num_workgroups.x + workgroup_id.y;
-
     let global_invocation_index = workgroup_index * 64 + local_invocation_index;
 
     if (global_invocation_index >= uniforms.num_splats) {
         var data: RenderData;
-        data.position = vec3(9,9,9);
-        data.v1 = vec2f(0);
-        data.v2 = vec2f(0);
-        data.m = vec2f(0);
         output[global_invocation_index] = data;
         return;
     }
