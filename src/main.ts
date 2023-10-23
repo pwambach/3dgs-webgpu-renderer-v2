@@ -101,7 +101,7 @@ function onFirstChunk(detail: any) {
     device: renderer.device!,
     splats: detail.attributes.splats,
     numSplatFloats: loader.floatsPerSplatOut,
-    numOutputFloats: 16,
+    numOutputFloats: 12,
   });
 
   renderer.setVertexBuffer(splats.vertexBuffer);

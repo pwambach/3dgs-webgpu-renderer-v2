@@ -3,7 +3,6 @@ struct RenderOutput {
     opacity: f32,
     v1: vec2f,
     v2: vec2f,
-    m: vec2f,
     color: vec3f,
 }
 
@@ -23,7 +22,7 @@ fn vertexMain(
     var data = output[instance_index];
     
     // get the quad vertice from both eigenvectors 
-    var position = (offset.x * data.v1 + offset.y * data.v2) * data.m;
+    var position = offset.x * data.v1 + offset.y * data.v2;
 
     // set outputs
     var output: VertexOut;
@@ -31,5 +30,6 @@ fn vertexMain(
     output.position = vec4f(data.position.xy + position, data.position.z, 1);
     output.color_and_opacity = vec4f(data.color, data.opacity);
     output.uv = offset;
+
     return output;
 }

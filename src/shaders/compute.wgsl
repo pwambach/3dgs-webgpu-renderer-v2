@@ -12,7 +12,6 @@ struct RenderData {
     opacity: f32,
     v1: vec2f,
     v2: vec2f,
-    m: vec2f,
     color: vec3f,
 }
 
@@ -33,12 +32,12 @@ struct Uniforms {
 @group(1) @binding(0) var<storage, read> sort_indices: array<u32>;
 @group(2) @binding(0) var<uniform> uniforms: Uniforms;
 
-@compute @workgroup_size(64)
+@compute @workgroup_size(128)
 fn main(
     @builtin(workgroup_id) workgroup_id : vec3<u32>,
     @builtin(local_invocation_index) local_invocation_index: u32
     ) {
-    let global_invocation_index = workgroup_id.x * 64 + local_invocation_index;
+    let global_invocation_index = workgroup_id.x * 128 + local_invocation_index;
 
     if (global_invocation_index >= uniforms.num_splats) {
         return;
@@ -56,24 +55,24 @@ fn main(
     // calculate eigenvectors to get gaussian bounding box 
     var det: f32 = cov2d.x * cov2d.z - cov2d.y * cov2d.y;
     var mean = 0.5 * (cov2d.x + cov2d.z);
+    var d = sqrt(mean * mean - det);
 
     // eigenvalues (see https://www.youtube.com/watch?v=e50Bj7jn9IQ)
-    var l1 = mean + sqrt(mean * mean - det);
-    var l2 = mean - sqrt(mean * mean - det);
+    var l1 = mean + d;
+    var l2 = mean - d;
     
     // eigenvectors (see https://people.math.harvard.edu/~knill/teaching/math21b2004/exhibits/2dmatrices/index.html)
     var v1 = normalize(vec2f(cov2d.y, cov2d.z - l2)) * sqrt(l1);
     var v2 = normalize(vec2f(v1.y, -v1.x)) * sqrt(l2);
 
     // get the quad vertice from both eigenvectors 
-    var m = 6 / uniforms.screen * uniforms.splat_size * 1;//saturate(max(0, uniforms.time - splat.load_time) / 1000); // not 100% sure why * 6 fits
+    var m = 6 / uniforms.screen * uniforms.splat_size;// * saturate(max(0, uniforms.time - splat.load_time) / 1000); // not 100% sure why * 6 fits
 
     // set outputs
     var data: RenderData;
     data.position = clip_position.xyz;
-    data.v1 = v1;
-    data.v2 = v2;
-    data.m = m;
+    data.v1 = v1 * m;
+    data.v2 = v2 * m;
     data.color = calcColor(splat.position, splat.sh);
     data.opacity = splat.opacity;
 
@@ -82,14 +81,15 @@ fn main(
 }
 
 
-// main parts from https://github.com/aras-p/UnityGaussianSplatting/tree/main
+// parts from https://github.com/aras-p/UnityGaussianSplatting/tree/main
 // (see also "EWA Splatting" Zwicker et al 2002)
 fn covariance2D(world_pos: vec3f, cov3d1: vec3f, cov3d2: vec3f) -> vec3f {
     var view_mat = uniforms.view_matrix * uniforms.model_matrix;
     var view_pos: vec3f = (view_mat * vec4f(world_pos, 1)).xyz;
 
     // "this is needed in order for splats that are visible in view but clipped "quite a lot" to work"
-    // TODO check what exactly is going on here
+    // https://github.com/aras-p/UnityGaussianSplatting/tree/main
+    // TODO this deforms large splats near camera, check if there is another way 
     let tanFovX: f32 = 1 / (uniforms.proj_matrix[0][0]);
     let tanFovY: f32 = 1 / (uniforms.proj_matrix[1][1] * (uniforms.proj_matrix[0][0] / uniforms.proj_matrix[1][1]));
     let limX: f32 = 1.3 * tanFovX;
@@ -97,15 +97,14 @@ fn covariance2D(world_pos: vec3f, cov3d1: vec3f, cov3d2: vec3f) -> vec3f {
     view_pos.x = clamp(view_pos.x / view_pos.z, -limX, limX) * view_pos.z;
     view_pos.y = clamp(view_pos.y / view_pos.z, -limY, limY) * view_pos.z;
 
-    let f = uniforms.screen.x * uniforms.proj_matrix[0][0] / 2;
+    let f = uniforms.screen.x * uniforms.proj_matrix[0][0] * 0.5;
 
     // Jacobian
-    // self transposed
-    var J = transpose(mat3x3f(
-        f / view_pos.z, 0, -(f * view_pos.x) / (view_pos.z * view_pos.z),
-        0, f / view_pos.z, -(f * view_pos.y) / (view_pos.z * view_pos.z),
-        0, 0, 0
-    ));
+    var J = mat3x3f(
+        f / view_pos.z, 0, 0,
+        0, f / view_pos.z, 0,
+        -(f * view_pos.x) / (view_pos.z * view_pos.z), -(f * view_pos.y) / (view_pos.z * view_pos.z), 0
+    );
 
     var W = mat3x3f(
         view_mat[0][0], view_mat[0][1], view_mat[0][2],

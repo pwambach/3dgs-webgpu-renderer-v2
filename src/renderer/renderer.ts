@@ -318,7 +318,7 @@ export class Renderer {
     computePass.setBindGroup(0, this.bindGroupDataCompute!);
     computePass.setBindGroup(1, this.bindGroupSort!);
     computePass.setBindGroup(2, this.bindGroupUniforms!);
-    const x = Math.ceil(count / 64);
+    const x = Math.ceil(count / 128);
     computePass.dispatchWorkgroups(x);
 
     computePass.end();
