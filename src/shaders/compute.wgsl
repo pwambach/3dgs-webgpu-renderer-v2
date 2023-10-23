@@ -33,15 +33,12 @@ struct Uniforms {
 @group(1) @binding(0) var<storage, read> sort_indices: array<u32>;
 @group(2) @binding(0) var<uniform> uniforms: Uniforms;
 
-@compute @workgroup_size(8,8)
+@compute @workgroup_size(64)
 fn main(
     @builtin(workgroup_id) workgroup_id : vec3<u32>,
-    @builtin(num_workgroups) num_workgroups: vec3<u32>,
-    @builtin(local_invocation_index) local_invocation_index: u32,
-    @builtin(global_invocation_id) global_invocation_id: vec3<u32>,
+    @builtin(local_invocation_index) local_invocation_index: u32
     ) {
-    let workgroup_index = workgroup_id.x * num_workgroups.x + workgroup_id.y;
-    let global_invocation_index = workgroup_index * 64 + local_invocation_index;
+    let global_invocation_index = workgroup_id.x * 64 + local_invocation_index;
 
     if (global_invocation_index >= uniforms.num_splats) {
         return;
