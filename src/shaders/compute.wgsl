@@ -44,13 +44,10 @@ fn main(
     let global_invocation_index = workgroup_index * 64 + local_invocation_index;
 
     if (global_invocation_index >= uniforms.num_splats) {
-        var data: RenderData;
-        output[global_invocation_index] = data;
         return;
     }
 
-    var sorted_index: u32 = sort_indices[global_invocation_index];
-    var splat = splats[sorted_index];
+    var splat = splats[global_invocation_index];
 
      // get the clip position of the center of the splat 
     var clip_position = uniforms.proj_matrix * uniforms.view_matrix * uniforms.model_matrix * vec4f(splat.position, 1);
@@ -82,8 +79,9 @@ fn main(
     data.m = m;
     data.color = calcColor(splat.position, splat.sh);
     data.opacity = splat.opacity;
-    
-    output[global_invocation_index] = data;
+
+    var sorted_index: u32 = sort_indices[global_invocation_index];
+    output[sorted_index] = data;
 }
 
 

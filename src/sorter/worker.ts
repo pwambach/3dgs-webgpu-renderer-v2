@@ -4,20 +4,21 @@
 
 self.onmessage = (e: Event) => {
   // @ts-ignore
-  let [indices, splats, p, stride] = e.data;
+  let [indices, indicesT, splats, p, stride] = e.data;
 
   // let t = Date.now();
   const [px, py, pz] = p;
   const splatLength = indices.length;
 
-  const tmp = new Float32Array(splatLength);
+  const tmp = new Float32Array(indices.buffer);
 
   for (let i = 0; i < splatLength; i++) {
-    const j = i * stride + 0;
-    const x = splats[j];
-    const y = splats[j + 1];
-    const z = splats[j + 2];
-    tmp[i] = (x - px) * (x - px) + (y - py) * (y - py) + (z - pz) * (z - pz);
+    const s = indicesT[i];
+    const j = s * stride;
+    const a = splats[j] - px;
+    const b = splats[j + 1] - py;
+    const c = splats[j + 2] - pz;
+    tmp[s] = a * a + b * b + c * c;
   }
 
   // console.log("1 fill", Date.now() - t);
@@ -28,15 +29,22 @@ self.onmessage = (e: Event) => {
   }
 
   // @ts-ignore
-  sort(indices, compare);
+  sort(indicesT, compare);
+
+  // indicesT  -> i = layer, v = splat num
+  // indices -> i = splat num, v = layer
+
+  for (let i = 0; i < indices.length; i++) {
+    indices[indicesT[i]] = i;
+  }
 
   // console.log("2 sort", Date.now() - t);
   // t = Date.now();
 
   self.postMessage(
-    [indices, splats],
+    [indices, indicesT, splats],
     // @ts-ignore
-    [indices.buffer, splats.buffer]
+    [indices.buffer, indicesT.buffer, splats.buffer]
   );
 };
 
