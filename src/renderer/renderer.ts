@@ -22,6 +22,7 @@ export class Renderer {
   private bindGroupUniformsLayout?: GPUBindGroupLayout;
   private vertexBuffer?: GPUBuffer;
   private nextDrawCount = 0;
+  private nextDrawLimit = 0;
   device?: GPUDevice;
 
   constructor(canvasId: string) {
@@ -286,7 +287,7 @@ export class Renderer {
   startDrawLoop() {
     const loop = () => {
       if (this.nextDrawCount > 0) {
-        this.drawVertices(this.nextDrawCount);
+        this.drawVertices(this.nextDrawCount, this.nextDrawLimit);
         this.nextDrawCount = 0;
       }
 
@@ -296,11 +297,12 @@ export class Renderer {
     loop();
   }
 
-  draw(count: number) {
+  draw(count: number, limit: number) {
     this.nextDrawCount = count;
+    this.nextDrawLimit = limit;
   }
 
-  drawVertices(count: number) {
+  drawVertices(count: number, limit: number) {
     if (
       !this.device ||
       !this.ctx ||
@@ -318,9 +320,7 @@ export class Renderer {
     computePass.setBindGroup(0, this.bindGroupDataCompute!);
     computePass.setBindGroup(1, this.bindGroupSort!);
     computePass.setBindGroup(2, this.bindGroupUniforms!);
-    const x = Math.ceil(count / 128);
-    computePass.dispatchWorkgroups(x);
-
+    computePass.dispatchWorkgroups(Math.ceil(count / 128));
     computePass.end();
 
     const renderPass = encoder.beginRenderPass({
@@ -337,7 +337,7 @@ export class Renderer {
     renderPass.setPipeline(this.renderPipeline);
     renderPass.setVertexBuffer(0, this.vertexBuffer);
     renderPass.setBindGroup(0, this.bindGroupDataRender!);
-    renderPass.draw(6, count);
+    renderPass.draw(6, limit);
     renderPass.end();
 
     this.device.queue.submit([encoder.finish()]);

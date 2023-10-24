@@ -17,7 +17,7 @@ const camera = new OrbitCamera({
   lookAt: vec3.fromValues(0, -1, -0.2),
 });
 const loader = new Loader("/truck/point_cloud2.ply", initTime);
-new Pane(uniforms, camera);
+const pane = new Pane(uniforms, camera);
 
 let splats: Splats | null = null;
 
@@ -37,8 +37,12 @@ async function start() {
     }
 
     splats!.uploadSplats(e.detail.info.byteStart, e.detail.info.byteEnd);
-    renderer.draw(loader.processedSplats);
+    renderer.draw(loader.splatCount, pane.params.splatLimit);
     uniforms.setTime();
+
+    if (!pane.params.splatCount) {
+      pane.setSplatCount(loader.splatCount);
+    }
   });
 
   loader.addEventListener("end", async () => {
@@ -51,7 +55,7 @@ async function start() {
 
     sorter.addEventListener("sorted", () => {
       splats?.uploadSort(sorter.indices);
-      renderer.draw(loader.processedSplats);
+      renderer.draw(loader.splatCount, pane.params.splatLimit);
     });
 
     const loop = () => {
@@ -59,6 +63,18 @@ async function start() {
       requestAnimationFrame(loop);
     };
     loop();
+
+    let loadAnimation = true;
+    const loadAnimationLoop = () => {
+      if (!loadAnimation) return;
+      uniforms.setTime();
+      requestAnimationFrame(loadAnimationLoop);
+    };
+    loadAnimationLoop();
+
+    setTimeout(() => {
+      loadAnimation = false;
+    }, 10000);
   });
 
   // on camera change
@@ -70,13 +86,13 @@ async function start() {
 
   // render on uniforms change (camera, splatSize, etc.)
   uniforms.addEventListener("change", () => {
-    renderer.draw(loader.processedSplats);
+    renderer.draw(loader.splatCount, pane.params.splatLimit);
 
     // make sure the last buffer upload is also rendered
     // (note: this won't render twice per frame because the renderer uses a draw queue)
-    requestAnimationFrame(() => {
-      renderer.draw(loader.processedSplats);
-    });
+    // requestAnimationFrame(() => {
+    //   renderer.draw(loader.splatCount, pane.params.splatLimit);
+    // });
   });
 
   // window resize listener

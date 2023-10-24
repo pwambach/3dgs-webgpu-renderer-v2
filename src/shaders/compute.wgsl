@@ -66,7 +66,7 @@ fn main(
     var v2 = normalize(vec2f(v1.y, -v1.x)) * sqrt(l2);
 
     // get the quad vertice from both eigenvectors 
-    var m = 6 / uniforms.screen * uniforms.splat_size;// * saturate(max(0, uniforms.time - splat.load_time) / 1000); // not 100% sure why * 6 fits
+    var m = 6 / uniforms.screen * uniforms.splat_size * saturate(max(0, uniforms.time - splat.load_time) / 3000); // not 100% sure why * 6 fits
 
     // set outputs
     var data: RenderData;
