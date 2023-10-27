@@ -304,6 +304,8 @@ export class Renderer {
 
   drawVertices(count: number, limit: number) {
     if (
+      count === 0 ||
+      limit === 0 ||
       !this.device ||
       !this.ctx ||
       !this.renderPipeline ||

@@ -1,5 +1,5 @@
 // import debounce from "lodash.debounce";
-import { Loader } from "./loader/loader";
+import { Loader } from "./loader/index";
 import { Renderer } from "./renderer/renderer";
 import { OrbitCamera } from "./orbit-camera";
 import { vec3, mat4 } from "gl-matrix";
@@ -17,23 +17,49 @@ const camera = new OrbitCamera({
   lookAt: vec3.fromValues(0, -1, -0.2),
 });
 const loader = new Loader("/truck/point_cloud2.ply", initTime);
+// initial transform of the splats
+const modelMatrix = mat4.fromTranslation(
+  mat4.create(),
+  vec3.fromValues(-2, -1.5, 0)
+);
+mat4.rotateX(modelMatrix, modelMatrix, 1.5);
+mat4.rotateZ(modelMatrix, modelMatrix, -0.6);
+mat4.translate(modelMatrix, modelMatrix, vec3.fromValues(0, 2, 0));
+mat4.rotateY(modelMatrix, modelMatrix, 0);
+mat4.rotateZ(modelMatrix, modelMatrix, 0);
+
+const loader = new Loader({ modelMatrix });
 const pane = new Pane(uniforms, camera);
+let sorter: Sorter;
 
 let splats: Splats | null = null;
 
 async function start() {
-  uniforms.modelMatrix = mat4.fromXRotation(mat4.create(), -0.2);
   uniforms.viewMatrix = camera.getViewMatrix();
   uniforms.projectionMatrix = camera.getProjectionMatrix();
   uniforms.cameraPos = camera.controls.position;
   uniforms.numShDegrees = 3;
 
   let firstChunkLoaded = false;
-  loader.load();
+  loader.load("/robo/point_cloud.ply");
   loader.addEventListener("update", (e: CustomEventInit) => {
     if (!firstChunkLoaded) {
       onFirstChunk(e.detail);
       firstChunkLoaded = true;
+    }
+
+    if (!sorter) {
+      sorter = new Sorter(loader.positions);
+
+      sorter.addEventListener("sorted", () => {
+        splats?.uploadSort(sorter.indices);
+      });
+
+      const loop = () => {
+        sorter.update(camera.controls.position, loader.processedSplats);
+        requestAnimationFrame(loop);
+      };
+      loop();
     }
 
     splats!.uploadSplats(e.detail.info.byteStart, e.detail.info.byteEnd);
@@ -46,35 +72,8 @@ async function start() {
   });
 
   loader.addEventListener("end", async () => {
-    splats?.uploadSplats(0, 0);
-
-    const sorter = new Sorter(
-      loader.attributes.splats,
-      loader.floatsPerSplatOut
-    );
-
-    sorter.addEventListener("sorted", () => {
-      splats?.uploadSort(sorter.indices);
-      renderer.draw(loader.splatCount, pane.params.splatLimit);
-    });
-
-    const loop = () => {
-      sorter.update(camera.controls.position);
-      requestAnimationFrame(loop);
-    };
-    loop();
-
-    let loadAnimation = true;
-    const loadAnimationLoop = () => {
-      if (!loadAnimation) return;
-      uniforms.setTime();
-      requestAnimationFrame(loadAnimationLoop);
-    };
-    loadAnimationLoop();
-
-    setTimeout(() => {
-      loadAnimation = false;
-    }, 10000);
+    // splats?.uploadSplats(0, 0);
+    console.log(loader);
   });
 
   // on camera change
@@ -90,9 +89,9 @@ async function start() {
 
     // make sure the last buffer upload is also rendered
     // (note: this won't render twice per frame because the renderer uses a draw queue)
-    // requestAnimationFrame(() => {
-    //   renderer.draw(loader.splatCount, pane.params.splatLimit);
-    // });
+    requestAnimationFrame(() => {
+      renderer.draw(loader.splatCount, pane.params.splatLimit);
+    });
   });
 
   // window resize listener
@@ -115,7 +114,7 @@ function onFirstChunk(detail: any) {
 
   splats = new Splats({
     device: renderer.device!,
-    splats: detail.attributes.splats,
+    splats: detail.splats,
     numSplatFloats: loader.floatsPerSplatOut,
     numOutputFloats: 12,
   });

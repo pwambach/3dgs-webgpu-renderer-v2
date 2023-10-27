@@ -46,7 +46,7 @@ fn main(
     var splat = splats[global_invocation_index];
 
      // get the clip position of the center of the splat 
-    var clip_position = uniforms.proj_matrix * uniforms.view_matrix * uniforms.model_matrix * vec4f(splat.position, 1);
+    var clip_position = uniforms.proj_matrix * uniforms.view_matrix * vec4f(splat.position, 1); // * uniforms.model_matrix
     clip_position = clip_position / clip_position.w;
 
     // cov2d vec3 is (a, b, d) of the 2x2 matrix
@@ -66,15 +66,17 @@ fn main(
     var v2 = normalize(vec2f(v1.y, -v1.x)) * sqrt(l2);
 
     // get the quad vertice from both eigenvectors 
-    var m = 6 / uniforms.screen * uniforms.splat_size * saturate(max(0, uniforms.time - splat.load_time) / 3000); // not 100% sure why * 6 fits
+    var t = max(0, uniforms.time - splat.load_time) / 2000;
+    var m = 6 / uniforms.screen * uniforms.splat_size * saturate(pow(t, 2)); // not 100% sure why * 6 fits
 
     // set outputs
     var data: RenderData;
     data.position = clip_position.xyz;
     data.v1 = v1 * m;
     data.v2 = v2 * m;
-    data.color = calcColor(splat.position, splat.sh);
-    data.opacity = splat.opacity;
+
+    data.color = calcColor(splat.position, splat.sh);// + (1 - saturate(pow(t, 2)) );
+    data.opacity = splat.opacity * (saturate(0.1 + pow(t, 2)));
 
     var sorted_index: u32 = sort_indices[global_invocation_index];
     output[sorted_index] = data;
@@ -84,7 +86,7 @@ fn main(
 // parts from https://github.com/aras-p/UnityGaussianSplatting/tree/main
 // (see also "EWA Splatting" Zwicker et al 2002)
 fn covariance2D(world_pos: vec3f, cov3d1: vec3f, cov3d2: vec3f) -> vec3f {
-    var view_mat = uniforms.view_matrix * uniforms.model_matrix;
+    var view_mat = uniforms.view_matrix;// * uniforms.model_matrix;
     var view_pos: vec3f = (view_mat * vec4f(world_pos, 1)).xyz;
 
     // "this is needed in order for splats that are visible in view but clipped "quite a lot" to work"

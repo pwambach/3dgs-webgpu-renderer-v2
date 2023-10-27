@@ -1,9 +1,10 @@
 import { fetchIterator } from "./fetch-iterator";
-import { vec3, quat, mat3 } from "gl-matrix";
+import { vec3, quat, mat3, mat4 } from "gl-matrix";
 
 type Properties = Record<string, { type: string; byteOffset: number }>;
 type Attributes = Record<string, Float32Array>;
 interface UpdateInfo {
+  floatsPerSplatOut: number;
   processedSplats: number;
   addedSplats: number;
   totalSplats: number;
@@ -11,17 +12,9 @@ interface UpdateInfo {
   byteEnd: number;
 }
 
-// struct Splat {
-//   position: vec3f,
-//   cov3d1: vec3f,
-//   cov3d2: vec3f,
-//   sh: array<vec3f, 16>
-// }
-
 const HEADER_END = "end_header";
 
-export class Loader extends EventTarget {
-  private url: string;
+export class PlyReader extends EventTarget {
   private readonly decoder = new TextDecoder();
   private tmpBuffer = new Uint8Array(5e6);
   private tmpBufferIndex = 0;
@@ -32,16 +25,26 @@ export class Loader extends EventTarget {
   splatCount = 0;
   processedSplats = 0;
   processedByteCount = 0;
+  isStreaming = false;
   initTime = 0;
 
-  constructor(url: string, initTime: number) {
+  constructor() {
     super();
-    this.url = url;
-    this.initTime = initTime;
+
+    console.log(this.constructor.name);
   }
 
-  load() {
-    function handleUpdate(this: Loader, info: UpdateInfo) {
+  load(url: string, modelMatrix: mat4) {
+    if (this.isStreaming) {
+      console.warn(`[${this.constructor.name}] Already streaming!`);
+      return;
+    }
+
+    this.initTime = Date.now();
+    this.isStreaming = true;
+    this.dispatchEvent(new CustomEvent("start"));
+
+    function handleUpdate(this: PlyReader, info: UpdateInfo) {
       this.dispatchEvent(
         new CustomEvent("update", {
           detail: {
@@ -52,15 +55,24 @@ export class Loader extends EventTarget {
       );
     }
 
-    this.streamResponse(handleUpdate.bind(this)).then(() => {
-      this.dispatchEvent(new CustomEvent("end"));
-    });
+    function handleEnd(this: PlyReader) {
+      requestAnimationFrame(() => {
+        this.isStreaming = false;
+        this.dispatchEvent(new CustomEvent("end"));
+      });
+    }
 
-    return {};
+    this.streamResponse(url, modelMatrix, handleUpdate.bind(this)).then(
+      handleEnd.bind(this)
+    );
   }
 
-  private async streamResponse(chunkCallback: (info: UpdateInfo) => void) {
-    const streamIterator = fetchIterator(this.url);
+  private async streamResponse(
+    url: string,
+    modelMatrix: mat4,
+    chunkCallback: (info: UpdateInfo) => void
+  ) {
+    const streamIterator = fetchIterator(url);
     let headerText = "";
     let headerEndIndex = -1;
 
@@ -89,7 +101,7 @@ export class Loader extends EventTarget {
 
       // if header already parsed pull complete splats out of tmp buffer
       if (this.splatCount > 0) {
-        const updateInfo = this.extractSplats();
+        const updateInfo = this.extractSplats(modelMatrix);
         if (updateInfo.addedSplats > 0) {
           chunkCallback(updateInfo);
         }
@@ -98,7 +110,6 @@ export class Loader extends EventTarget {
 
     // free tmp buffer
     this.tmpBuffer = new Uint8Array(0);
-    console.log("finished", this);
   }
 
   private parseHeader(text: string) {
@@ -131,7 +142,7 @@ export class Loader extends EventTarget {
     );
   }
 
-  private extractSplats() {
+  private extractSplats(modelMatrix: mat4) {
     const numSplatsToExtract = Math.floor(
       this.tmpBufferIndex / this.bytesPerSplatIn
     );
@@ -147,6 +158,7 @@ export class Loader extends EventTarget {
 
     const vecPosition = vec3.create();
     const quatRotation = quat.create();
+    const modelMat3 = mat3.fromMat4(mat3.create(), modelMatrix);
     const matRotateExtra = mat3.fromValues(1, 0, 0, 0, -1, 0, 0, 0, -1);
     const matScale = mat3.create();
     const matRotate = mat3.create();
@@ -164,6 +176,7 @@ export class Loader extends EventTarget {
       );
       // rotate all points 180 deg around x (we want +y up)
       vec3.rotateX(vecPosition, vecPosition, [0, 0, 0], Math.PI);
+      vec3.transformMat4(vecPosition, vecPosition, modelMatrix);
 
       // scale
       const scaleX = Math.exp(this.readValue(dataView, i, "scale_0"));
@@ -180,9 +193,15 @@ export class Loader extends EventTarget {
         this.readValue(dataView, i, "rot_3"),
         this.readValue(dataView, i, "rot_0")
       );
+
+      // quat.multiply(quatRotation, quatRotation, quatData);
+
+      // mat4.fromXRotation(mat4.create(), 1.65)
+
       quat.normalize(quatRotation, quatRotation);
       mat3.fromQuat(matRotate, quatRotation);
       mat3.mul(matCov3d, matRotateExtra, matRotate);
+      mat3.mul(matCov3d, modelMat3, matCov3d);
       mat3.mul(matCov3d, matCov3d, matScale);
       mat3.transpose(matRotate, matCov3d);
       mat3.mul(matCov3d, matCov3d, matRotate);
@@ -237,6 +256,7 @@ export class Loader extends EventTarget {
       Float32Array.BYTES_PER_ELEMENT;
 
     return {
+      floatsPerSplatOut: this.floatsPerSplatOut,
       processedSplats: this.processedSplats,
       addedSplats: numSplatsToExtract,
       totalSplats: this.splatCount,

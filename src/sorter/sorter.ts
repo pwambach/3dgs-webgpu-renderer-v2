@@ -4,19 +4,20 @@ import WorkerUrl from "./worker?url";
 export class Sorter extends EventTarget {
   indices: Uint32Array;
   indicesT: Uint32Array;
-  splats: Float32Array;
-  stride: number;
+  positions: Float32Array;
+  positionsCopy: Float32Array;
   isSorting = false;
   prevCameraPosition = vec3.create();
   worker = new Worker(WorkerUrl);
   time = 0;
+  lastProcessedSplats = 0;
 
-  constructor(splats: Float32Array, stride: number) {
+  constructor(positions: Float32Array) {
     super();
-    this.splats = splats;
-    this.stride = stride;
-    this.indices = new Uint32Array(splats.length / stride);
-    this.indicesT = new Uint32Array(splats.length / stride);
+    this.positions = positions;
+    this.positionsCopy = new Float32Array(positions.length);
+    this.indices = new Uint32Array(positions.length / 3); // 3 = x,y,z
+    this.indicesT = new Uint32Array(positions.length / 3);
 
     for (let i = 0; i < this.indices.length; i++) {
       this.indicesT[i] = i;
@@ -27,7 +28,7 @@ export class Sorter extends EventTarget {
 
       this.indices = e.data[0];
       this.indicesT = e.data[1];
-      this.splats = e.data[2];
+      this.positionsCopy = e.data[2];
       this.isSorting = false;
       this.dispatchEvent(new Event("sorted"));
     };
@@ -37,7 +38,7 @@ export class Sorter extends EventTarget {
     };
   }
 
-  update(cameraPosition: vec3) {
+  update(cameraPosition: vec3, processedSplats: number) {
     if (this.isSorting) {
       return;
     }
@@ -49,6 +50,14 @@ export class Sorter extends EventTarget {
     // if sort needed and not already sorting -> do it
     if (cameraChanged && !this.isSorting) {
       this.isSorting = true;
+
+      const needsCopy = this.lastProcessedSplats < this.positions.length / 3;
+      this.lastProcessedSplats = processedSplats;
+
+      if (needsCopy) {
+        this.positionsCopy.set(this.positions);
+      }
+
       this.sort();
     }
   }
@@ -59,11 +68,10 @@ export class Sorter extends EventTarget {
       [
         this.indices,
         this.indicesT,
-        this.splats,
+        this.positionsCopy,
         this.prevCameraPosition,
-        this.stride,
       ],
-      [this.indices.buffer, this.indicesT.buffer, this.splats.buffer]
+      [this.indices.buffer, this.indicesT.buffer, this.positionsCopy.buffer]
     );
   }
 }

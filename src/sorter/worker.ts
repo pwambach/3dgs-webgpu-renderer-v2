@@ -1,10 +1,8 @@
-// self.importScripts(
-//   "https://cdn.jsdelivr.net/npm/timsort@0.3.0/build/timsort.min.js"
-// );
+// @ts-nocheck
 
 self.onmessage = (e: Event) => {
   // @ts-ignore
-  let [indices, indicesT, splats, p, stride] = e.data;
+  let [indices, indicesT, splats, p] = e.data;
 
   // let t = Date.now();
   const [px, py, pz] = p;
@@ -14,7 +12,7 @@ self.onmessage = (e: Event) => {
 
   for (let i = 0; i < splatLength; i++) {
     const s = indicesT[i];
-    const j = s * stride;
+    const j = s * 3;
     const a = splats[j] - px;
     const b = splats[j + 1] - py;
     const c = splats[j + 2] - pz;
@@ -29,9 +27,10 @@ self.onmessage = (e: Event) => {
   }
 
   // @ts-ignore
-  sort(indicesT, compare);
+  // sort(indicesT, compare, 0, 0);
+  indicesT.sort(compare);
 
-  // indicesT  -> i = layer, v = splat num
+  // indicesT -> i = layer, v = splat num
   // indices -> i = splat num, v = layer
 
   for (let i = 0; i < indices.length; i++) {
