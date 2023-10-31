@@ -55,12 +55,12 @@ export class Uniforms extends EventTarget {
     this.dirty = true;
   }
 
-  set viewMatrix(m: mat4) {
+  set viewMatrix(m: number[]) {
     this.typedArray.set(m, 16);
     this.dirty = true;
   }
 
-  set projectionMatrix(m: mat4) {
+  set projectionMatrix(m: number[]) {
     this.typedArray.set(m, 32);
     this.dirty = true;
   }

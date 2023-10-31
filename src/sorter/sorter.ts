@@ -47,8 +47,10 @@ export class Sorter extends EventTarget {
     // save camera position
     vec3.copy(this.prevCameraPosition, cameraPosition);
 
+    const processedSplatsChanged = processedSplats !== this.lastProcessedSplats;
+
     // if sort needed and not already sorting -> do it
-    if (cameraChanged && !this.isSorting) {
+    if ((processedSplatsChanged || cameraChanged) && !this.isSorting) {
       this.isSorting = true;
 
       const needsCopy = this.lastProcessedSplats < this.positions.length / 3;
